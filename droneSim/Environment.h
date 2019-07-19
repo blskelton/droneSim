@@ -81,53 +81,47 @@ public:
 		float last_milestone = m_prev_loop_end_time;
 		float loop_time = (m_curr_loop_start_time - m_prev_loop_end_time);
 
-		//for testing
-		Event lastEvent = {};
-		int counter = 0;
-
 		//assert((m_curr_loop_start_time - m_prev_loop_end_time) > 0);
 
 		if (m_event_queue.size() > 0) {
 			while (m_event_queue.top().timestamp <= m_curr_loop_start_time) {
 				Event currEvent = m_event_queue.top(); //make event const?
-				if (currEvent.age == m_unitArray[currEvent.idA].get_age() || currEvent.tag == ACTION_EVENT || currEvent.tag == MESSAGE_EVENT) {
-					//assert((currEvent.timestamp>=last_milestone));
-					float t = currEvent.timestamp - last_milestone;
+				float t = currEvent.timestamp - last_milestone;
+				if (currEvent.tag == BOX_EVENT) {
+					int actual_age = m_unitArray[currEvent.data.boxEvent.id].get_age();
+					if (currEvent.data.boxEvent.age == actual_age) {
+						if (t > 0) {
+							for (int i = 0; i < global_num_units; i++) {
+								m_unitArray[i].process(t);
+							}
+						}
+						m_grid.handle_box_event(currEvent, m_unitArray[currEvent.data.boxEvent.id], m_event_queue);
+					}
+				}
+				if (currEvent.tag == UC_EVENT) {
+					int actual_age = m_unitArray[currEvent.data.ucEvent.idA].get_age();
+					if (currEvent.data.ucEvent.ageA == actual_age) {
+						if (t > 0) {
+							for (int i = 0; i < global_num_units; i++) {
+								m_unitArray[i].process(t);
+							}
+						}
+						m_grid.handle_uc_event(currEvent, m_unitArray[currEvent.data.ucEvent.idA], m_unitArray[currEvent.data.ucEvent.idB], m_event_queue);
+						m_unitArray[currEvent.data.ucEvent.idA].set_color(1, 0, 0);
+					}
+				}
+				if (currEvent.tag == ACTION_EVENT) {
 					if (t > 0) {
 						for (int i = 0; i < global_num_units; i++) {
 							m_unitArray[i].process(t);
-							//just update location, don't undergo entire processing
 						}
 					}
-					if (currEvent.tag == UC_EVENT) { //unit collision event
-						m_grid.handle_uc_event(currEvent, m_unitArray[currEvent.idA], m_unitArray[currEvent.idB], m_event_queue);
-						m_unitArray[currEvent.idA].set_color(1, 0, 0);
-					}
-					if (currEvent.tag == BOX_EVENT) {
-						m_grid.handle_box_event(currEvent, m_unitArray[currEvent.idA], m_event_queue);
-					}
-					if (currEvent.tag == ACTION_EVENT) {
-						m_unitArray[currEvent.idA].handle_action_event();
-					}
-					//if (currEvent.tag == MESSAGE_EVENT) {
-						//m_unitArray[currEvent.idB].accept_message(currEvent.message);
-					//}
+					m_unitArray[currEvent.data.actionEvent.id].handle_action_event();
+				}
+				last_milestone += t;
 
-					last_milestone += t;
-
-					if (lastEvent.tag == currEvent.tag) {
-						if (lastEvent.idA == currEvent.idA) {
-							if (lastEvent.idB == currEvent.idB) {
-								if (lastEvent.timestamp == currEvent.timestamp) {
-									counter++;
-								}
-							}
-						}
-					}
-					lastEvent = currEvent;
-					if (m_event_queue.size() == 0) {
-						return;
-					}
+				if (m_event_queue.size() == 0) {
+					return;
 				}
 				m_event_queue.pop();
 			}
@@ -139,11 +133,6 @@ public:
 			m_unitArray[i].user_process();
 		}
 		m_prev_loop_end_time = m_curr_loop_start_time;
-
-		/*if (m_event_queue.size() > max_queue_size) {
-			max_queue_size = m_event_queue.size();
-			printf("%d\n", max_queue_size);
-		}*/
 
 	};
 
@@ -179,6 +168,15 @@ public:
 		float dif = (now.QuadPart - m_start_time.QuadPart);
 		dif = dif / m_freq.QuadPart;
 		return dif*1000;
+	};
+
+	inline Box get_box(Unit& unit) {
+		return m_grid.get_box(unit);
+	}
+
+	inline void add_out_of_container_box_event(Unit& unit, Box& box) {
+		Event new_event = m_grid.get_next_non_container_box_event(unit, box);
+		m_event_queue.emplace(new_event);
 	};
 
 	void change_view(int);

@@ -47,11 +47,42 @@ Unit::~Unit()
 void Unit::calc_next_location(float loop_time) {
 	float t = loop_time;
 	
-	m_location[0] = m_location[0] + m_direction[0] * m_speed * t;
-	//float test = m_direction[0] * 0.0075 * 667;
-	m_location[1] = m_location[1] + m_direction[1] * m_speed * t;
-	m_location[2] = m_location[2] + m_direction[2] * m_speed * t;
+	m_location[cX] = m_location[cX] + m_direction[cX] * m_speed * t;
+	m_location[cY] = m_location[cY] + m_direction[cY] * m_speed * t;
+	m_location[cZ] = m_location[cZ] + m_direction[cZ] * m_speed * t;
+	if (m_location[cX] < -15 || m_location[cX] > 15) {
+		m_in_container = false;
+	}
+	if (m_location[cY] < -15 || m_location[cY] > 15) {
+		m_in_container = false;
+	}
+	if (m_location[cZ] < -35 || m_location[cZ] > 5) {
+		m_in_container = false;
+	}
+	
+	Box current_box = globalEnvironment.get_box(*this);
+	if (!current_box.in_container) { //has escaped the container
+		if (!m_heading_towards_container) { //not currently heading back towards container
+			//flip boolean
+			m_in_container = false;
+			//reverse direction
+			m_direction[cX] = -m_direction[cX];
+			m_direction[cY] = -m_direction[cY];
+			m_direction[cZ] = -m_direction[cZ];
+			//age unit
+			increment_age(); //later on, call environment.recalculate collisions
+			//add new box collision
+			globalEnvironment.add_out_of_container_box_event(*this, current_box);
+			//m_heading_towards_container = true;
+		}
+	}
 };
+
+void Unit::reenter_container() {
+	//if in container, update bool, randomize direction, update age and collisions
+	m_in_container = true;
+	randomize_direction();
+}
 
 float Unit::calc_intersection_time(float distance) {
 	//globalEnvironment.init_prev_end_timestamp();
@@ -172,6 +203,7 @@ void Unit::check_container_collision() {
 		change_in_direction = true;
 	}
 	if (change_in_direction) {
+		//m_speed = 0.0;
 		globalEnvironment.recalculate_collisions(*this);
 	}
 }
@@ -185,7 +217,7 @@ void Unit::recv(int senderID = -1) {
 		Event event = m_message_queues[senderID].front();
 		float timestamp = event.timestamp;
 		while (timestamp <= globalEnvironment.get_time()) {
-			process_msg(event.message);
+			process_msg(event.data.messageEvent.message);
 			m_message_queues[senderID].pop();
 			if (m_message_queues[senderID].size() > 0) {
 				event = m_message_queues[senderID].front();
@@ -210,8 +242,9 @@ void Unit::send(Message message, int recvID) {
 	float timestamp = globalEnvironment.get_message_delay();
 	timestamp += globalEnvironment.get_time();
 
-	Event message_event = { MESSAGE_EVENT, m_id, 0, recvID, timestamp, Box{}, false, message };
-	
+	MessageEvent data = { m_id, recvID, message };
+	Event message_event = { MESSAGE_EVENT, timestamp, {data} };
+
 	Unit& recv = globalEnvironment.get_unit(recvID);
 	recv.accept_message(message_event);
 }
@@ -273,8 +306,7 @@ void Unit::randomize_direction() {
 	globalEnvironment.recalculate_collisions(*this);
 }
 
-Event Unit::perform_unit_collision(Unit &unit) {
-	Event event {};
+void Unit::perform_unit_collision(Unit &unit, std::priority_queue<Event, vector<Event>, myEventComparator> &pq) {
 	bool colliding = false;
 	if (unit.get_id() != m_id) {
 		if (is_colliding(unit)) {
@@ -282,19 +314,20 @@ Event Unit::perform_unit_collision(Unit &unit) {
 			float time = m_bufferRadius*2 / m_speed; //number of ms to travel buffer diameter
 			time += globalEnvironment.get_time();
 			
-			globalEnvironment.recalculate_collisions(*this);
-			event = { ACTION_EVENT, m_id, m_age, 0, time};
+			ActionEvent data = { m_id };
+			Event new_event = { ACTION_EVENT, time, { data } };
+			pq.emplace(new_event);
 
 			temp_direction[cX] = m_direction[cX];
 			temp_direction[cY] = m_direction[cY];
 			temp_direction[cZ] = m_direction[cZ];
 
 			randomize_direction();
+			globalEnvironment.recalculate_collisions(*this);
 		}
 	}
 	if (!colliding) {
 		//attempt to generate a new collision event for the two units
 		globalEnvironment.recalculate_uc_collision(*this, unit.get_id());
 	}
-	return event;
 }

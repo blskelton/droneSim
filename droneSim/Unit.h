@@ -19,14 +19,16 @@ class Environment;
 class Unit {
 private:
 	queue<Event> m_message_queues[global_num_units];
-	//priority_queue<Message, vector<Message>, message_comparator> m_message_queues[global_num_units];
-	vector<Message> m_messages;
+	//vector<Message> m_messages;
 	vector<queue<Message>> m_message_boxes;
 	vector<unordered_map<int, vector<Message>>> m_sorted_messages;
 
 	float temp_direction[3];
 	int m_msgsReceived;
 	float m_color[3];
+
+	bool m_in_container = true;
+	bool m_heading_towards_container = false;
 
 	//current location of unit
 	float m_location[3];
@@ -67,12 +69,22 @@ public:
 
 	virtual ~Unit();
 
+	inline bool get_container_bool() {
+		return m_in_container;
+	};
+
+	inline void update_heading_back_var() {
+		m_heading_towards_container = true;
+	};
+
+	void reenter_container();
+
 	inline void increment_age() {
 		m_age++;
 	};
 
 	inline void accept_message(Event messageEvent) {
-		int senderID = messageEvent.message.get_sender();
+		int senderID = messageEvent.data.messageEvent.message.get_sender();
 		m_message_queues[senderID].emplace(messageEvent);
 	};
 
@@ -201,7 +213,7 @@ public:
 	void check_container_collision();
 
 	//given two colliding units, enacts collision protocol (currently calculates new velocity for both)
-	Event perform_unit_collision(Unit&);
+	void perform_unit_collision(Unit&, std::priority_queue<Event, vector<Event>, myEventComparator>&);
 
 	//generates a new random destination
 	void init_dest();

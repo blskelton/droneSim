@@ -9,7 +9,7 @@ class Container;
 extern Environment globalEnvironment;
 extern Container globalContainer;
 
-extern constexpr int global_num_units = 45;
+extern constexpr int global_num_units = 50;
 
 extern constexpr int cX = 0;
 extern constexpr int cY = 1;

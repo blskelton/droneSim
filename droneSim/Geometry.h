@@ -7,10 +7,18 @@
 struct Plane {
 	int coordinate;
 	float offset;
+
+	bool equals(Plane secondPlane) {
+		if (coordinate == secondPlane.coordinate && offset == secondPlane.offset) {
+			return true;
+		}
+		return false;
+	}
 };
 
 struct Box {
 	int positions[3];
+	bool in_container;
 };
 
 struct myVector {

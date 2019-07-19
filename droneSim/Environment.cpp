@@ -39,12 +39,12 @@ void Environment::add_unit(int unitID) {
 	Unit newUnit = m_unitArray[unitID];
 
 	if (unitID == 0) {
-		m_unitArray[0].set_location(-5, 0, -12.5);
-		m_unitArray[0].set_dest(5, 0, -12.5);
-		//m_unitArray[0].change_direction(1, 0, 0);
+		m_unitArray[0].set_location((float)-5.1, (float)0, (float)-15);
+		//m_unitArray[0].set_dest(5, 0, -12.5);
+		m_unitArray[0].change_direction(1, 0, 0);
 	}
 	if (unitID == 1) {
-		m_unitArray[1].set_location(5, 1, -12.5);
+		m_unitArray[1].set_location(5.5, 0, -15);
 		m_unitArray[1].change_direction(-1, 0, 0);
 	}
 

@@ -21,6 +21,7 @@ Container::Container() {
 }
 
 void Container::draw_container() {
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glPushMatrix();
 
 	glColor3f(1.0, 1.0, 0.0);
@@ -28,12 +29,28 @@ void Container::draw_container() {
 	//glutWireCube(m_Xdimension); //WILL HAVE TO CHANGE
 	glPopMatrix();
 
-	//top
-	//glRecti(m_leftX, m_closeZ, m_rightX, m_farZ);
+	//front
+	glPushMatrix();
+	glTranslatef(0, 0, m_closeZ);
+	glRecti(m_leftX, m_bottomY, m_rightX, m_topY);
+	glPopMatrix();
 
-	glBegin(GL_POLYGON);
+	//back
+	glPushMatrix();
+	glTranslatef(0, 0, m_farZ);
+	glRecti(m_leftX, m_bottomY, m_rightX, m_topY);
+	glPopMatrix();
+
+	//edges
+	glBegin(GL_LINES);
 	glVertex3f(m_leftX, m_topY, m_closeZ);
+	glVertex3f(m_leftX, m_topY, m_farZ);
+	glVertex3f(m_leftX, m_bottomY, m_closeZ);
+	glVertex3f(m_leftX, m_bottomY, m_farZ);
 	glVertex3f(m_rightX, m_topY, m_closeZ);
+	glVertex3f(m_rightX, m_topY, m_farZ);
+	glVertex3f(m_rightX, m_bottomY, m_closeZ);
+	glVertex3f(m_rightX, m_bottomY, m_farZ);
 	glEnd();
 
 	//X axis

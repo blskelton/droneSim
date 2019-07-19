@@ -1,5 +1,6 @@
 #include <boost/algorithm/clamp.hpp>
 #include <unordered_map>
+#include <cmath>
 
 #include "Unit.h"
 #include "simulator.h"
@@ -18,7 +19,7 @@ class Environment;
 class Boxes {
 private:
 	//box dimensions (proportional to default radius)
-	int m_box_size[3] = {(int) Unit::DEFAULT_RADIUS * 4, (int)Unit::DEFAULT_RADIUS * 4, (int)Unit::DEFAULT_RADIUS * 4 };
+	int m_box_size[3] = {(int) (Unit::DEFAULT_RADIUS * 4), (int)(Unit::DEFAULT_RADIUS * 4), (int)(Unit::DEFAULT_RADIUS * 4) };
 
 	//number of boxes per side assuming cube container and boxes
 	static constexpr int num_x_boxes = Container::CONTAINER_X / (int)(Unit::DEFAULT_RADIUS * 4);
@@ -27,6 +28,7 @@ private:
 
 	int m_boxes_per_side[3] = {num_x_boxes, num_y_boxes, num_z_boxes };
 	Plane m_planes[num_x_boxes][num_y_boxes][num_z_boxes][3][2]; //in three directions, two planes per direction
+	Plane m_bounding_planes[6]; //bounding planes in each direction
 	//4d nested array representing whether not a given unit is in a given box
 	bool m_unit_membership[num_x_boxes][num_y_boxes][num_z_boxes][global_num_units];
 	bool m_present_collisions[global_num_units][global_num_units];
@@ -41,27 +43,54 @@ public:
 		m_present_collisions[idB][idA] = false;
 	};
 
+	inline void get_box_dimensions(int(&arr)[3]) {
+		arr[cX] = m_box_size[cX];
+		arr[cY] = m_box_size[cY];
+		arr[cZ] = m_box_size[cZ];
+		return;
+	};
+
 	inline Box get_box(Unit& unit) {
 		//get from unit location to box indices
 		float unitX = unit.get_location()[cX];
 		float unitY = unit.get_location()[cY];
 		float unitZ = unit.get_location()[cZ];
 
+		//get container boundaries
+		int rightX = globalContainer.get_rightX();
+		int topY = globalContainer.get_topY();
+		int closeZ = globalContainer.get_closeZ();
+
+		bool in_container = true;
+		bool positive_dir = true;
+
+		if (unitX > rightX || unitY > topY || unitZ > closeZ) { //out of boundaries in positive direction
+			in_container = false;
+		}
+
 		//transform location values to index from lower left far corner
-		unitX += globalContainer.get_rightX();
-		unitY += globalContainer.get_topY();
+		unitX += rightX;
+		unitY += topY;
 		unitZ += -(globalContainer.get_farZ());
 
-		int xBoxIndex = unitX / m_box_size[cX];
-		int yBoxIndex = unitY / m_box_size[cY];
-		int zBoxIndex = unitZ / m_box_size[cZ];
 
-		xBoxIndex = boost::algorithm::clamp(xBoxIndex, 0, 9);
-		yBoxIndex = boost::algorithm::clamp(yBoxIndex, 0, 9);
-		zBoxIndex = boost::algorithm::clamp(zBoxIndex, 0, 9);
-
-		Box myBox = { xBoxIndex, yBoxIndex, zBoxIndex };
-		m_unit_membership[xBoxIndex][yBoxIndex][zBoxIndex][unit.get_id()] = true;
+		if (unitX < 0) {
+			unitX = std::floor(unitX / m_box_size[cX]);
+			in_container = false;
+			positive_dir = false;
+		}
+		if (unitY < 0) {
+			unitY = std::floor(unitY / m_box_size[cY]);
+			in_container = false;
+			positive_dir = false;
+		}
+		if (unitZ < 0) {
+			unitZ = std::floor(unitZ / m_box_size[cZ]);
+			in_container = false;
+			positive_dir = false;
+		}
+		Box myBox = {(int) unitX,(int) unitY, (int)unitZ, in_container };
+		m_unit_membership[(int)unitX][(int)unitY][(int)unitZ][unit.get_id()] = true; //have to change for non-container boxes (hashmap?)
 		return myBox;
 	};
 
@@ -71,7 +100,8 @@ public:
 		float collisionTime = unit.unit_collision(id);
 		if (collisionTime > 0) {
 			if (m_present_collisions[unit.get_id()][id] == false && m_present_collisions[id][unit.get_id()] == false) {
-				Event collisionEvent = { UC_EVENT, unit.get_id(), unit.get_age(), id, collisionTime };
+				UCEvent data = { unit.get_id(), unit.get_age(), id };
+				Event collisionEvent = { UC_EVENT, collisionTime, {data} };
 				pq.emplace(collisionEvent);
 				m_present_collisions[unit.get_id()][id] = true;
 				m_present_collisions[id][unit.get_id()] = true;
@@ -82,37 +112,43 @@ public:
 	void get_future_boxes(Unit&, Box(&arr)[8]);
 	
 	std::vector<int> get_units_in_box(Unit&); //returns vector of unit IDs of units in same box(es)
-	
-	//std::vector<int> get_units_in_box(Box, vector<int>&);
 
 	inline void handle_box_event(Event currEvent, Unit& unit, std::priority_queue<Event, vector<Event>, myEventComparator>& eventQueue) {
-		if (currEvent.containerCollision) {
+		Box box = get_box(unit);
+		if (currEvent.data.boxEvent.containerCollision && unit.get_container_bool()) {
 			unit.check_container_collision();
 		}
+		if (currEvent.data.boxEvent.containerCollision && !unit.get_container_bool()) {
+			//get box
+			if (box.in_container) {
+				unit.reenter_container();
+			}
+			else { //not in container
+				eventQueue.emplace(get_next_non_container_box_event(unit, box));
+			}
+			//if not in container, make another call to get_outside_box_collision
+		}
+
 		//remove old membership
-		m_unit_membership[currEvent.box.positions[cX]][currEvent.box.positions[cY]][currEvent.box.positions[cZ]][currEvent.idA] = false;
+		int positionsX = currEvent.data.boxEvent.box.positions[cX];
+		int positionsY = currEvent.data.boxEvent.box.positions[cY];
+		int positionsZ = currEvent.data.boxEvent.box.positions[cZ];
+		m_unit_membership[positionsX][positionsY][positionsZ][currEvent.data.boxEvent.id] = false;
 		//add new membership
 		get_box(unit);
-		Event nextEvent = get_next_box_event(unit);
+		//Event nextEvent = get_next_box_event(unit);
 		eventQueue.emplace(get_next_box_event(unit));
 		add_collisions(unit, eventQueue);
 	};
 
 	inline void handle_uc_event(Event currEvent, Unit& unitA, Unit& unitB, std::priority_queue<Event, vector<Event>, myEventComparator>& eventQueue) {
-		Event actionEvent = unitA.perform_unit_collision(unitB);
-		if (actionEvent.timestamp > 0) {
-			eventQueue.emplace(actionEvent);
-		}
-		remove_collision_tag(currEvent.idA, currEvent.idB);
-	
-		/*if (actionEvent.timestamp > m_curr_loop_start_time) { //collision occured, actionEvent is valid
-			m_event_queue.emplace(actionEvent);
-		}
-		m_grid.add_collisions(m_unitArray[currEvent.idA], m_event_queue);
-		m_grid.remove_collision_tag(currEvent.idA, currEvent.idB);*/
+		unitA.perform_unit_collision(unitB, eventQueue);
+		remove_collision_tag(currEvent.data.ucEvent.idA, currEvent.data.ucEvent.idB);
 	};
 	
 	Event get_next_box_event(Unit&);
+
+	Event get_next_non_container_box_event(Unit&, Box&);
 	
 	float time_to_plane(Unit&, Plane);
 	

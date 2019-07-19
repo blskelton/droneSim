@@ -25,6 +25,13 @@ Boxes::Boxes() {
 	int topY = globalContainer.get_topY();
 	int closeZ = globalContainer.get_closeZ();
 
+	m_bounding_planes[0] = Plane{ 0, (float)leftX };
+	m_bounding_planes[1] = Plane{ 0, (float)rightX };
+	m_bounding_planes[2] = Plane{ 1, (float)bottomY };
+	m_bounding_planes[3] = Plane{ 1, (float)topY };
+	m_bounding_planes[4] = Plane{ 2, (float)closeZ };
+	m_bounding_planes[5] = Plane{ 2, (float)farZ };
+
 	for (int i = 0; i < m_boxes_per_side[cX]; i++) {
 		for (int j = 0; j < m_boxes_per_side[cY]; j++) {
 			for (int k = 0; k < m_boxes_per_side[cZ]; k++) {
@@ -118,7 +125,7 @@ float Boxes::time_to_plane(Unit& unit, Plane plane) {
 	}
 
 	float t = (planeNormal.dot_product(planePoint)-planeNormal.dot_product(location)) / (planeNormal.dot_product(dirNormalized));
-	return t;
+	return abs(t);
 }
 
 void Boxes::get_plane_info(Plane plane, myVector &normal, myVector &point) {
@@ -140,6 +147,91 @@ void Boxes::get_plane_info(Plane plane, myVector &normal, myVector &point) {
 		normal.vals[cZ] = 1;
 		point = { 0, 0, plane.offset};
 	}
+}
+
+Event Boxes::get_next_non_container_box_event(Unit& unit, Box& box) {
+	int leftX = globalContainer.get_leftX();
+	int bottomY = globalContainer.get_bottomY();
+	int farZ = globalContainer.get_farZ();
+	int rightX = globalContainer.get_rightX();
+	int topY = globalContainer.get_topY();
+	int closeZ = globalContainer.get_closeZ();
+
+	Plane right, left, top, bottom, nearPlane, farPlane;
+	
+	
+	right = { cX, (float)leftX + (box.positions[cX] + 1)*m_box_size[cX]};
+	left = { cX, (float)leftX + (box.positions[cX])*m_box_size[cX] };
+	top = { cY, (float)bottomY + (box.positions[cY] + 1)*m_box_size[cY] };
+	bottom = { cY, (float)bottomY + (box.positions[cY])*m_box_size[cY] };
+	nearPlane = { cZ, (float)farZ + (box.positions[cZ] + 1)*m_box_size[cZ] };
+	farPlane = { cZ, (float)farZ + (box.positions[cZ])*m_box_size[cZ] };
+
+	float min = INFINITY;
+	Plane currPlane;
+	Plane closestPlane;
+	//eliminate planes in opposite direction
+	if (unit.get_direction()[cX] >= 0) {
+		currPlane = right;
+		float time = time_to_plane(unit, currPlane);
+		if (time < min) {
+			closestPlane = right;
+			min = time;
+		}
+	}
+	if (unit.get_direction()[cX] < 0) {
+		currPlane = left;
+		float time = time_to_plane(unit, currPlane);
+		if (time < min) {
+			closestPlane = left;
+			min = time;
+		}
+	}
+	if (unit.get_direction()[cY] >= 0) {
+		currPlane = top;
+		float time = time_to_plane(unit, currPlane);
+		if (time < min) {
+			closestPlane = top;
+			min = time;
+		}
+	}
+	if (unit.get_direction()[cY] < 0) {
+		currPlane = bottom;
+		float time = time_to_plane(unit, currPlane);
+		if (time < min) {
+			closestPlane = bottom;
+			min = time;
+		}
+	}
+	if (unit.get_direction()[cZ] >= 0) {
+		currPlane = nearPlane;
+		float time = time_to_plane(unit, currPlane);
+		if (time < min) {
+			closestPlane = nearPlane;
+			min = time;
+		}
+	}
+	if (unit.get_direction()[cZ] < 0) {
+		currPlane = farPlane;
+		float time = time_to_plane(unit, currPlane);
+		if (time < min) {
+			closestPlane = farPlane;
+			min = time;
+		}
+	}
+	bool containerCollision = false;
+
+	for (Plane plane : m_bounding_planes) {
+		if (closestPlane.equals(plane)) {
+			containerCollision = true;
+		}
+	}
+
+	float intersectionTime = unit.calc_intersection_time(min);
+	BoxEvent data = { unit.get_id(), unit.get_age(), box, containerCollision };
+	Event event = { BOX_EVENT, intersectionTime, {data} };
+	return event;
+
 }
 
 Event Boxes::get_next_box_event(Unit& unit) {
@@ -212,24 +304,16 @@ Event Boxes::get_next_box_event(Unit& unit) {
 		}
 	}
 	bool containerCollision = false;
-	
-	//container collision in x or y directions
-	if (closestPlane.coordinate == cX || closestPlane.coordinate == cY) {
-		if (closestPlane.offset == globalContainer.get_leftX() || closestPlane.offset == globalContainer.get_rightX()) {
-			containerCollision = true;
-		}
-	}
 
-	//container collision in z direction
-	if (closestPlane.coordinate == cZ) {
-		if (closestPlane.offset == globalContainer.get_closeZ() || closestPlane.offset == globalContainer.get_farZ()) {
+	for (Plane plane : m_bounding_planes) {
+		if (closestPlane.equals(plane)) {
 			containerCollision = true;
 		}
 	}
 
 	float intersectionTime = unit.calc_intersection_time(min);
-	//boxEvent data = { unitID, unit.get_age(), prevBox, containerCollision };
-	Event event = { BOX_EVENT, unitID, unit.get_age(), 0, intersectionTime, prevBox, containerCollision };
+	BoxEvent data = { unitID, unit.get_age(), prevBox, containerCollision };
+	Event event = { BOX_EVENT, intersectionTime, {data} };
 	return event;
 }
 

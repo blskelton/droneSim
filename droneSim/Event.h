@@ -4,24 +4,24 @@
 #ifndef Event_h
 #define Event_h
 
-struct boxEvent {
+struct BoxEvent {
 	int id;
 	int age;
 	Box box;
 	bool containerCollision;
 };
 
-struct ucEvent {
+struct UCEvent {
 	int idA;
 	int ageA;
 	int idB;
 };
 
-struct actionEvent {
+struct ActionEvent {
 	int id;
 };
 
-struct messageEvent {
+struct MessageEvent {
 	int idA;
 	int idB;
 	Message message;
@@ -29,14 +29,27 @@ struct messageEvent {
 
 struct Event {
 	int tag; //0 if box, 1 if uc, 2 if action, 3 if message
-	int idA;
-	int age;
-	int idB;
-	//int ageB;
 	float timestamp;
-	Box box;
-	bool containerCollision;
-	Message message;
+	//contents data;
+	union contents {
+		BoxEvent boxEvent;
+		UCEvent ucEvent;
+		ActionEvent actionEvent;
+		MessageEvent messageEvent;
+
+		contents(BoxEvent boxEvent) {
+			this->boxEvent = boxEvent;
+		}
+		contents(UCEvent ucEvent) {
+			this->ucEvent = ucEvent;
+		}
+		contents(ActionEvent actionEvent) {
+			this->actionEvent = actionEvent;
+		}
+		contents(MessageEvent messageEvent) {
+			this->messageEvent = messageEvent;
+		}
+	} data;
 };
 
 class myEventComparator
