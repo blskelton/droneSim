@@ -13,34 +13,30 @@ Unit::Unit() {
 Unit::Unit(int i) : m_id{i}
 {
 	for (int j = 0; j < global_num_units; j++) {
-		m_message_boxes.emplace_back();
 		m_sorted_messages.emplace_back();
 	}	
 	m_msgsReceived = 0;
 	//initialize particle properties
-	m_color[0] = 0;
-	m_color[1] = 1;
-	m_color[2] = 1;
+	m_color[cX] = 0;
+	m_color[cY] = 1;
+	m_color[cZ] = 1;
 
 	m_containerSize = globalContainer.get_x_dimension();
 
 	int max = 1000 * (m_containerSize - 2 * m_bufferRadius); //sub out m_radius for m_bufferRadius?
 
-	m_location[0] = (float)(rand() % max) / 1000 - m_containerSize / 2 + m_bufferRadius;
-	m_location[1] = (float)(rand() % max) / 1000 - m_containerSize / 2 + m_bufferRadius;
-	m_location[2] = (float)(rand() % max) / 1000 - 30 + m_bufferRadius;
+	m_location[cX] = (float)(rand() % max) / 1000 - m_containerSize / 2 + m_bufferRadius;
+	m_location[cY] = (float)(rand() % max) / 1000 - m_containerSize / 2 + m_bufferRadius;
+	m_location[cZ] = (float)(rand() % max) / 1000 - 30 + m_bufferRadius;
 	
 	m_speed = (float)  0.0075; //distance traveled per ms
-	m_hasDest = false;
-	//m_radius = 0.5;// (float);// -m_containerSize / 2; 0.25; //make constexpr default radius
-	//m_radius = default_radius;
 	m_bufferRadius = m_radius * 2;
+	init_dest();
 	set_direction();
 }
 
 Unit::~Unit()
 {
-	m_message_boxes.clear();
 	m_sorted_messages.clear();
 }
 
@@ -85,12 +81,10 @@ void Unit::reenter_container() {
 }
 
 float Unit::calc_intersection_time(float distance) {
-	//globalEnvironment.init_prev_end_timestamp();
 	float time = distance / m_speed;
-	time = max(time, 0.001);
-	//process(time);
+	time = max(time, 0.001); //ensure that timestamp does not equal current time
 	m_location;
-	return globalEnvironment.get_time() + time; //increment by 1 to account for floating point errors
+	return globalEnvironment.get_time() + time;
 }
 
 void Unit::change_speed(bool is_accelerating) {
@@ -106,15 +100,14 @@ void Unit::change_speed(bool is_accelerating) {
 
 void Unit::set_direction() {
 	if (m_hasDest) {
-		//incorporate location
-		m_direction[0] = m_dest[0] - m_location[0];
-		m_direction[1] = m_dest[1] - m_location[1];
-		m_direction[2] = m_dest[2] - m_location[2];
+		m_direction[cX] = m_dest[cX] - m_location[cX];
+		m_direction[cY] = m_dest[cY] - m_location[cY];
+		m_direction[cZ] = m_dest[cZ] - m_location[cZ];
 	}
 	else {
-		m_direction[0] = ((float)(rand() % 201))-100;
-		m_direction[1] = ((float)(rand() % 201))-100;
-		m_direction[2] = ((float)(rand() % 201))-100;
+		m_direction[cX] = ((float)(rand() % 201))-100;
+		m_direction[cY] = ((float)(rand() % 201))-100;
+		m_direction[cZ] = ((float)(rand() % 201))-100;
 	}
 	normalize_direction();
 	globalEnvironment.recalculate_collisions(*this);
@@ -122,31 +115,38 @@ void Unit::set_direction() {
 
 void Unit::init_dest() {
 	//generate new random destination
-	m_radius;
-	m_bufferRadius;
-	
 	int max = 1000 * (m_containerSize - 2 * (m_radius * 3)); //sub out m_radius for m_bufferRadius?
-	m_dest[0] = (float)(rand() % max) / 1000 - m_containerSize / 2 + (m_radius * 3);
-	m_dest[1] = (float)(rand() % max) / 1000 - m_containerSize / 2 + (m_radius * 3);
-	m_dest[2] = (float)(rand() % max) / 1000 - 30 + m_radius * 3;
+	m_dest[cX] = (float)(rand() % max) / 1000 - m_containerSize / 2 + (m_radius * 3);
+	m_dest[cY] = (float)(rand() % max) / 1000 - m_containerSize / 2 + (m_radius * 3);
+	m_dest[cZ] = (float)(rand() % max) / 1000 - 30 + m_radius * 3;
 
 	m_hasDest = true;
 	set_direction();
 }
 
+void Unit::generate_destination_event(std::priority_queue<Event, vector<Event>, myEventComparator>& event_queue) {
+	set_direction();
+	DestinationEvent data = { m_id, m_age, m_radius };
+	float distance = calc_distance_to_site(m_dest[cX], m_dest[cY], m_dest[cZ]);
+	float timestamp = calc_intersection_time(distance);
+
+	Event destination_event = { DESTINATION_EVENT, timestamp, {data} };
+	event_queue.emplace(destination_event);
+}
+
 void Unit::set_dest(float x_dest, float y_dest, float z_dest) {
-	m_dest[0] = x_dest;
-	m_dest[1] = y_dest;
-	m_dest[2] = z_dest;
+	m_dest[cX] = x_dest;
+	m_dest[cY] = y_dest;
+	m_dest[cZ] = z_dest;
 	m_hasDest = true;
 	set_direction();
 }
 
 float Unit::calc_distance_to_site(float site_x, float site_y, float site_z) {
 	//get particle location
-	float m_x = m_location[0];
-	float m_y = m_location[1];
-	float m_z = m_location[2];
+	float m_x = m_location[cX];
+	float m_y = m_location[cY];
+	float m_z = m_location[cZ];
 
 	//get other location
 	float x = (m_x - site_x);
@@ -165,9 +165,9 @@ void Unit::set_speed(float speed) {
 
 void Unit::check_container_collision() {
 	//get particle location
-	float particleX = m_location[0];
-	float particleY = m_location[1];
-	float particleZ = m_location[2];
+	float particleX = m_location[cX];
+	float particleY = m_location[cY];
+	float particleZ = m_location[cZ];
 	
 	int leftX = globalContainer.get_leftX();
 	int rightX = globalContainer.get_rightX();
@@ -255,13 +255,7 @@ void Unit::process(float loop_time) {
 }
 
 void Unit::user_process() {
-	if (m_dest && calc_distance_to_site(m_dest[cX], m_dest[cY], m_dest[cZ]) < 0.1) {
-		init_dest();
-	}
-	for (int i = 0; i < global_num_units; i++) {
-		globalEnvironment.test_send(m_id, i);
-	}
-	
+	globalEnvironment.send_message(m_id, rand() % global_num_units);
 	recv(-1);
 	//change_speed(true);
 }
@@ -299,9 +293,9 @@ float Unit::unit_collision(int unitID) {
 }
 
 void Unit::randomize_direction() {
-	m_direction[0] = ((float)(rand() % 201)) - 100;
-	m_direction[1] = ((float)(rand() % 201)) - 100;
-	m_direction[2] = ((float)(rand() % 201)) - 100;
+	m_direction[cX] = ((float)(rand() % 201)) - 100;
+	m_direction[cY] = ((float)(rand() % 201)) - 100;
+	m_direction[cZ] = ((float)(rand() % 201)) - 100;
 	normalize_direction();
 	globalEnvironment.recalculate_collisions(*this);
 }

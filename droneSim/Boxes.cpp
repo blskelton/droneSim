@@ -1,5 +1,6 @@
 #include <vector>
 #include <unordered_map>
+#include <map>
 
 #include "Unit.h"
 #include "Event.h"
@@ -35,12 +36,16 @@ Boxes::Boxes() {
 	for (int i = 0; i < m_boxes_per_side[cX]; i++) {
 		for (int j = 0; j < m_boxes_per_side[cY]; j++) {
 			for (int k = 0; k < m_boxes_per_side[cZ]; k++) {
-				m_planes[i][j][k][cX][0] = { cX, (float)leftX + (i + 1)*m_box_size[cX] };
-				m_planes[i][j][k][cX][1] = { cX, (float)leftX + i * m_box_size[cX] };
-				m_planes[i][j][k][cY][0] = { cY, (float)bottomY + (j + 1) * m_box_size[cY] };
-				m_planes[i][j][k][cY][1] = { cY, (float)bottomY + j * m_box_size[cY] };
-				m_planes[i][j][k][cZ][0] = { cZ, (float)farZ + (k + 1) * m_box_size[cZ] };
-				m_planes[i][j][k][cZ][1] = { cZ, (float)farZ + k * m_box_size[cZ] };
+				std::array<Plane, 6> planes;
+				planes[0] = { cX, (float)leftX + (i + 1)*m_box_size[cX] };
+				planes[1] = { cX, (float)leftX + i * m_box_size[cX] };
+				planes[2] = { cY, (float)bottomY + (j + 1) * m_box_size[cY] };
+				planes[3] = { cY, (float)bottomY + j * m_box_size[cY] };
+				planes[4] = { cZ, (float)farZ + (k + 1) * m_box_size[cZ] };
+				planes[5] = { cZ, (float)farZ + k * m_box_size[cZ] };
+				std::array<int, 3> position_array = { i, j, k};
+				m_plane_map[position_array] = planes;
+
 				for (int a = 0; a < global_num_units; a++) {
 					m_unit_membership[i][j][k][a] = false;
 				}
@@ -150,22 +155,36 @@ void Boxes::get_plane_info(Plane plane, myVector &normal, myVector &point) {
 }
 
 Event Boxes::get_next_non_container_box_event(Unit& unit, Box& box) {
-	int leftX = globalContainer.get_leftX();
-	int bottomY = globalContainer.get_bottomY();
-	int farZ = globalContainer.get_farZ();
-	int rightX = globalContainer.get_rightX();
-	int topY = globalContainer.get_topY();
-	int closeZ = globalContainer.get_closeZ();
 
 	Plane right, left, top, bottom, nearPlane, farPlane;
+	std::array<int, 3> position_array = { box.positions[0], box.positions[1],box.positions[2] };
+	if (m_plane_map.find(position_array) == m_plane_map.end()) { //box not in map
+		int leftX = globalContainer.get_leftX();
+		int bottomY = globalContainer.get_bottomY();
+		int farZ = globalContainer.get_farZ();
+		int rightX = globalContainer.get_rightX();
+		int topY = globalContainer.get_topY();
+		int closeZ = globalContainer.get_closeZ();
+
+		right = { cX, (float)leftX + (box.positions[cX] + 1)*m_box_size[cX] };
+		left = { cX, (float)leftX + (box.positions[cX])*m_box_size[cX] };
+		top = { cY, (float)bottomY + (box.positions[cY] + 1)*m_box_size[cY] };
+		bottom = { cY, (float)bottomY + (box.positions[cY])*m_box_size[cY] };
+		nearPlane = { cZ, (float)farZ + (box.positions[cZ] + 1)*m_box_size[cZ] };
+		farPlane = { cZ, (float)farZ + (box.positions[cZ])*m_box_size[cZ] };
+
+		std::array<Plane, 6> plane_array = { right, left, top, bottom, nearPlane, farPlane };
+		m_plane_map[position_array] = plane_array;
+	}
+	else { //box is in map
+		right = m_plane_map[position_array][0];
+		left = m_plane_map[position_array][1];
+		top = m_plane_map[position_array][2];
+		bottom = m_plane_map[position_array][3];
+		nearPlane = m_plane_map[position_array][4];
+		farPlane = m_plane_map[position_array][5];
+	}
 	
-	
-	right = { cX, (float)leftX + (box.positions[cX] + 1)*m_box_size[cX]};
-	left = { cX, (float)leftX + (box.positions[cX])*m_box_size[cX] };
-	top = { cY, (float)bottomY + (box.positions[cY] + 1)*m_box_size[cY] };
-	bottom = { cY, (float)bottomY + (box.positions[cY])*m_box_size[cY] };
-	nearPlane = { cZ, (float)farZ + (box.positions[cZ] + 1)*m_box_size[cZ] };
-	farPlane = { cZ, (float)farZ + (box.positions[cZ])*m_box_size[cZ] };
 
 	float min = INFINITY;
 	Plane currPlane;
@@ -239,17 +258,16 @@ Event Boxes::get_next_box_event(Unit& unit) {
 
 	//from unit, get candidate planes
 	Box prevBox = get_box(unit);
-	//if (prevBox.positions[cX] == 9) {
-		//int val = 0;
-	//}
+	std::array<int, 3> position_array = { prevBox.positions[0], prevBox.positions[1],prevBox.positions[2] };
+
 	Plane right, left, top, bottom, nearPlane, farPlane;
 
-	right = m_planes[prevBox.positions[cX]][prevBox.positions[cY]][prevBox.positions[cZ]][cX][0];
-	left = m_planes[prevBox.positions[cX]][prevBox.positions[cY]][prevBox.positions[cZ]][cX][1];
-	top = m_planes[prevBox.positions[cX]][prevBox.positions[cY]][prevBox.positions[cZ]][cY][0];
-	bottom = m_planes[prevBox.positions[cX]][prevBox.positions[cY]][prevBox.positions[cZ]][cY][1];
-	nearPlane = m_planes[prevBox.positions[cX]][prevBox.positions[cY]][prevBox.positions[cZ]][cZ][0];
-	farPlane = m_planes[prevBox.positions[cX]][prevBox.positions[cY]][prevBox.positions[cZ]][cZ][1];
+	right = m_plane_map[position_array][0];
+	left = m_plane_map[position_array][1];
+	top = m_plane_map[position_array][2];
+	bottom = m_plane_map[position_array][3];
+	nearPlane = m_plane_map[position_array][4];
+	farPlane = m_plane_map[position_array][5];
 
 	float min = INFINITY;
 	Plane currPlane;

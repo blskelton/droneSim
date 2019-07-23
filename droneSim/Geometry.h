@@ -21,6 +21,17 @@ struct Box {
 	bool in_container;
 };
 
+/*struct box_hash {
+	template<class T1, class T2, class T3, class T4> 
+	std::size_t operator() (const Box(T1, T2, T3, T4) &box) const
+	{
+		std::size_t h1 = std::hash<T1>()(box.positions[0]);
+		std::size_t h2 = std::hash<T2>()(box.positions[1]);
+		std::size_t h3 = std::hash<T3>()(box.positions[2]);
+		return h1 ^ h2 ^ h3; 
+	}
+};*/
+
 struct myVector {
 	float vals[3];
 	

@@ -19,8 +19,6 @@ class Environment;
 class Unit {
 private:
 	queue<Event> m_message_queues[global_num_units];
-	//vector<Message> m_messages;
-	vector<queue<Message>> m_message_boxes;
 	vector<unordered_map<int, vector<Message>>> m_sorted_messages;
 
 	float temp_direction[3];
@@ -218,6 +216,8 @@ public:
 	//generates a new random destination
 	void init_dest();
 
+	void generate_destination_event(std::priority_queue<Event, vector<Event>, myEventComparator>&);
+
 	//sets direction towards destination or in a random direction, then normalizes velocity
 	void set_direction();
 
@@ -227,10 +227,6 @@ public:
 	void set_speed(float);
 
 	void send(Message, int);
-
-	inline vector<queue<Message>>* get_message_box() {
-		return &m_message_boxes;
-	};
 
 	void recv(int);
 

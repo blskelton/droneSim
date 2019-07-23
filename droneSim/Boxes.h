@@ -1,5 +1,6 @@
 #include <boost/algorithm/clamp.hpp>
 #include <unordered_map>
+#include <map>
 #include <cmath>
 
 #include "Unit.h"
@@ -27,7 +28,10 @@ private:
 	static constexpr int num_z_boxes = Container::CONTAINER_Z / (int)(Unit::DEFAULT_RADIUS * 4);
 
 	int m_boxes_per_side[3] = {num_x_boxes, num_y_boxes, num_z_boxes };
-	Plane m_planes[num_x_boxes][num_y_boxes][num_z_boxes][3][2]; //in three directions, two planes per direction
+
+	//plane map
+	std::map<std::array<int, 3>, std::array<Plane, 6>> m_plane_map; //hash func for box?
+
 	Plane m_bounding_planes[6]; //bounding planes in each direction
 	//4d nested array representing whether not a given unit is in a given box
 	bool m_unit_membership[num_x_boxes][num_y_boxes][num_z_boxes][global_num_units];

@@ -19,6 +19,7 @@ extern constexpr int BOX_EVENT = 0;
 extern constexpr int UC_EVENT = 1;
 extern constexpr int ACTION_EVENT = 2;
 extern constexpr int MESSAGE_EVENT = 3;
+extern constexpr int DESTINATION_EVENT = 4;
 
 extern constexpr int TARGET_FPS = 24;
 

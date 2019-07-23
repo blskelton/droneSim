@@ -27,8 +27,14 @@ struct MessageEvent {
 	Message message;
 };
 
+struct DestinationEvent {
+	int id;
+	int age;
+	float epsilon; //maximum acceptable distance between unit and reached destination
+};
+
 struct Event {
-	int tag; //0 if box, 1 if uc, 2 if action, 3 if message
+	int tag; //0 if box, 1 if uc, 2 if action, 3 if message, 4 if destination
 	float timestamp;
 	//contents data;
 	union contents {
@@ -36,6 +42,7 @@ struct Event {
 		UCEvent ucEvent;
 		ActionEvent actionEvent;
 		MessageEvent messageEvent;
+		DestinationEvent destinationEvent;
 
 		contents(BoxEvent boxEvent) {
 			this->boxEvent = boxEvent;
@@ -48,6 +55,9 @@ struct Event {
 		}
 		contents(MessageEvent messageEvent) {
 			this->messageEvent = messageEvent;
+		}
+		contents(DestinationEvent destinationEvent) {
+			this->destinationEvent = destinationEvent;
 		}
 	} data;
 };

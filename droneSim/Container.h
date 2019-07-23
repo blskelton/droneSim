@@ -20,7 +20,6 @@ private:
 	int m_farZ;
 
 public:
-	//static constexpr int  GLOBAL_SIZE = 20;
 	static constexpr int CONTAINER_X = 20;
 	static constexpr int CONTAINER_Y = 20;
 	static constexpr int CONTAINER_Z = 20;

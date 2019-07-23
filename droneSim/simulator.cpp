@@ -18,8 +18,8 @@
 #include "simulator.h"
 
 //set-up
-float win_width = 512;
-float win_height = 512;
+float win_width = 1000;
+float win_height = 1000;
 
 //fps
 LARGE_INTEGER frequency;
@@ -75,8 +75,6 @@ void init_scene() {
 	//initialize vector of units
 	for (int i = 0; i < global_num_units; i++) {
 		globalEnvironment.add_unit(i);
-		//set random destination
-		//globalEnvironment.get_unit(i).init_dest();
 	}
 }
 
@@ -150,9 +148,10 @@ int main(int argc, char * argv[])
 
 	glutCreateWindow("droneSim");
 
+	globalEnvironment.init_prev_end_timestamp();
 	init();
 
-	globalEnvironment.init_prev_end_timestamp();
+	
 
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);

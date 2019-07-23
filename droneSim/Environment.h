@@ -20,8 +20,6 @@ private:
 	LARGE_INTEGER m_freq;
 	//start time
 	LARGE_INTEGER m_start_time;
-	bool x = QueryPerformanceCounter(&m_start_time);
-	bool useQPC = QueryPerformanceFrequency(&m_freq);
 	float m_prev_loop_end_time;
 	float m_curr_loop_start_time;
 	std::array<Unit, global_num_units> m_unitArray;
@@ -29,11 +27,11 @@ private:
 	int m_look[3];
 	int m_view;
 	Boxes m_grid;
-	int max_queue_size = 0;
+	int max_queue_size;
 	//for random message delay
 	std::random_device m_rd;
-	//for message counting
-	int m_message_counter[global_num_units][global_num_units];
+	std::mt19937 e2;
+	std::normal_distribution<> distribution;
 
 public:
 	Environment();
@@ -48,27 +46,25 @@ public:
 
 	inline int get_message_delay() {
 		//move elsewhere?
-		std::mt19937 e2(m_rd());
-		std::normal_distribution<> distribution(100, 100);
+		//std::mt19937 e2(m_rd());
+		//std::normal_distribution<> distribution(100, 100);
 
 		int delay = abs(distribution(e2)) * 10;
 		//int vals[100];
 		//for (int i = 0; i < 100; i++) {
 			//vals[i] = ((int)(abs(distribution(e2)) * 10));
 		//}		
-
 		return delay;
 	};
 
-	inline void recalculate_collisions(Unit& unit) {
-		//call when unit changes speed or direction
-		
+	inline void recalculate_collisions(Unit& unit) {//call when unit changes speed or direction
 		//increment unit age by 1 to invalidate old events
 		unit.increment_age();
 		//add new unit collision events
 		m_grid.add_collisions(unit, m_event_queue);
 		//add new box transfer event
 		m_event_queue.emplace(m_grid.get_next_box_event(unit));
+		//can't recalculate destination event; causes infinite loop
 	};
 
 	inline void recalculate_uc_collision(Unit& unit, int id) {
@@ -80,8 +76,6 @@ public:
 		m_curr_loop_start_time = get_num_milliseconds();
 		float last_milestone = m_prev_loop_end_time;
 		float loop_time = (m_curr_loop_start_time - m_prev_loop_end_time);
-
-		//assert((m_curr_loop_start_time - m_prev_loop_end_time) > 0);
 
 		if (m_event_queue.size() > 0) {
 			while (m_event_queue.top().timestamp <= m_curr_loop_start_time) {
@@ -117,6 +111,28 @@ public:
 						}
 					}
 					m_unitArray[currEvent.data.actionEvent.id].handle_action_event();
+				}
+				if (currEvent.tag == DESTINATION_EVENT) {
+					int id = currEvent.data.destinationEvent.id;
+					int actual_age = m_unitArray[id].get_age();
+					if (currEvent.data.destinationEvent.age == actual_age) {
+						if (t > 0) {
+							for (int i = 0; i < global_num_units; i++) {
+								m_unitArray[i].process(t);
+							}
+						}
+						float distance_to_dest = m_unitArray[id].calc_distance_to_site(m_unitArray[id].get_dest()[0], m_unitArray[id].get_dest()[1], m_unitArray[id].get_dest()[2]);
+						if (distance_to_dest < currEvent.data.destinationEvent.epsilon) {
+							m_unitArray[id].set_speed(0);
+							m_unitArray[id].set_color(0.5, 0, 1);
+						}
+						else { //regenerate destination event
+							m_unitArray[id].generate_destination_event(m_event_queue);
+						}
+					}
+					else {
+						m_unitArray[id].generate_destination_event(m_event_queue);
+					}
 				}
 				last_milestone += t;
 
@@ -179,11 +195,15 @@ public:
 		m_event_queue.emplace(new_event);
 	};
 
+	inline void add_to_queue(Event new_event) {
+		m_event_queue.emplace(new_event);
+	};
+
 	void change_view(int);
 	
 	void draw_unit(int);
 	
-	void test_send(int, int);
+	void send_message(int, int);
 	
 	std::vector<int> get_box_neighbors(int);
 };
