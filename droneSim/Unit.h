@@ -1,6 +1,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cmath>
+#include <queue>
 
 #include "Container.h"
 #include "Message.h"
@@ -20,13 +21,15 @@ class Unit {
 private:
 	queue<Event> m_message_queues[global_num_units];
 	vector<unordered_map<int, vector<Message>>> m_sorted_messages;
-
-	float temp_direction[3];
 	int m_msgsReceived;
+	//bool m_colliding_units[global_num_units];
 	float m_color[3];
 
-	bool m_in_container = true;
-	bool m_heading_towards_container = false;
+	bool m_in_container;
+	bool m_stopped;
+	bool m_core_collided;
+
+	int m_saw_collision;
 
 	//current location of unit
 	float m_location[3];
@@ -40,8 +43,14 @@ private:
 	//speed of unit
 	float m_speed;
 
+	//acceleration
+	float m_acceleration;
+
+	//goal speed
+	float m_goal_speed;
+
 	//destination point of unit
-	float m_dest[3];
+	float m_destination[3];
 
 	//unit id
 	int m_id;
@@ -49,11 +58,10 @@ private:
 	//outer radius
 	float m_bufferRadius = m_radius*3;
 
-	//length of one side of square container
-	int m_containerSize;
-
-	//boolean representing whether or not a unit has a destination point
-	bool m_hasDest;
+	//container dimensions
+	int m_containerX;
+	int m_containerY;
+	int m_containerZ;
 
 	//number of changes in speed or direction a unit has seen
 	int m_age = 0;
@@ -67,13 +75,18 @@ public:
 
 	virtual ~Unit();
 
+	bool heading_back();
+
 	inline bool get_container_bool() {
 		return m_in_container;
 	};
 
-	inline void update_heading_back_var() {
-		m_heading_towards_container = true;
-	};
+	inline void perform_core_collision() {
+		m_saw_collision;
+		m_core_collided = true;
+		stop_unit();
+		set_color(RED);
+	}
 
 	void reenter_container();
 
@@ -97,16 +110,15 @@ public:
 		m_direction[cZ] = m_direction[cZ] / sum;
 	}
 
-	inline void handle_action_event() {
-		m_direction[cX] = temp_direction[cX];
-		m_direction[cY] = temp_direction[cY];
-		m_direction[cZ] = temp_direction[cZ];
-		if (m_dest) {
-			set_direction();
-		}
+	void handle_action_event();
+
+	inline void unprocess(float t) {
+		m_location[cX] = m_location[cX] - m_direction[cX] * m_speed * t;
+		m_location[cY] = m_location[cY] - m_direction[cY] * m_speed * t;
+		m_location[cZ] = m_location[cZ] - m_direction[cZ] * m_speed * t;
 	};
 
-	inline bool is_colliding(Unit secondUnit) {
+	inline bool is_colliding(Unit& secondUnit, bool core_collision) {
 		float x1, y1, z1, x2, y2, z2, r1, r2;
 		x1 = m_location[cX];
 		y1 = m_location[cY];
@@ -115,29 +127,31 @@ public:
 		y2 = secondUnit.get_location()[cY];
 		z2 = secondUnit.get_location()[cZ];
 
-		r1 = m_bufferRadius;
-		r2 = secondUnit.get_buffer_radius();
-
+		if (core_collision) {
+			r1 = m_radius;
+			r2 = secondUnit.get_radius();
+		}
+		else {
+			r1 = m_bufferRadius;
+			r2 = secondUnit.get_buffer_radius();
+		}
 		float left = std::abs((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2)*(z1 - z2));
 		float right = (r1 + r2) * (r1 + r2);
-		
-		float distance = this->calc_distance_to_site(x2, y2, z2);
 
 		return std::abs((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)+(z1-z2)*(z1-z2)) < (r1 + r2) * (r1 + r2);
 	};
 
-	inline void change_direction(float x, float y, float z) {
-		m_direction[cX] = x;
-		m_direction[cY] = y;
-		m_direction[cZ] = z;
-		normalize_direction();
+	inline float get_goal_speed() {
+		return m_goal_speed;
 	};
 
-	float unit_collision(int);
+	float unit_collision(int, bool);
 
 	void process_msg(Message);
 
 	float calc_intersection_time(float);
+
+	float calc_arrival_time(float);
 
 	inline int get_num_messages() {
 		return m_msgsReceived;
@@ -152,10 +166,10 @@ public:
 	};
 
 	//sets color
-	inline void set_color(float red, float green, float blue) {
-		m_color[0] = red;
-		m_color[1] = green;
-		m_color[2] = blue;
+	inline void set_color(const float color[3]) {
+		m_color[0] = color[0];
+		m_color[1] = color[1];
+		m_color[2] = color[2];
 	};
 
 	//returns radius
@@ -177,8 +191,8 @@ public:
 	void set_dest(float, float, float);
 
 	//returns destination
-	inline float* get_dest() {
-		return m_dest;
+	inline float* get_destination() {
+		return m_destination;
 	};
 
 	inline float get_speed() {
@@ -205,18 +219,26 @@ public:
 		m_location[2] = z;
 	};
 
-	void change_speed(bool);
+	void update_speed();
+
+	inline bool is_core_collided() {
+		return m_core_collided;
+	};
 
 	//calculates unit-container collision
 	void check_container_collision();
 
 	//given two colliding units, enacts collision protocol (currently calculates new velocity for both)
-	void perform_unit_collision(Unit&, std::priority_queue<Event, vector<Event>, myEventComparator>&);
+	Event perform_unit_collision(Unit&, priority_queue<Event, vector<Event>, myEventComparator>&);
 
 	//generates a new random destination
-	void init_dest();
+	void init_destination();
 
-	void generate_destination_event(std::priority_queue<Event, vector<Event>, myEventComparator>&);
+	void generate_eta_event(priority_queue<Event, vector<Event>, myEventComparator>&);
+
+	void handle_eta_event(priority_queue<Event, vector<Event>, myEventComparator>&, float);
+
+	void handle_wait_event(priority_queue<Event, vector<Event>, myEventComparator>&);
 
 	//sets direction towards destination or in a random direction, then normalizes velocity
 	void set_direction();
@@ -224,6 +246,13 @@ public:
 	void randomize_direction();
 
 	//sets unit speed
+	inline void stop_unit() {
+		m_speed = 0;
+		m_stopped = true;
+	};
+
+	void randomize_location();
+
 	void set_speed(float);
 
 	void send(Message, int);
@@ -234,8 +263,5 @@ public:
 
 	virtual void user_process();
 
-	inline bool has_dest() {
-		return m_hasDest;
-	};
 };
 #endif /* Unit_h */

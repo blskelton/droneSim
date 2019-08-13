@@ -27,10 +27,17 @@ struct MessageEvent {
 	Message message;
 };
 
-struct DestinationEvent {
+struct ETAEvent {
 	int id;
-	int age;
 	float epsilon; //maximum acceptable distance between unit and reached destination
+};
+
+struct WaitEvent {
+	int id;
+};
+
+struct SpeedChangeEvent {
+
 };
 
 struct Event {
@@ -42,7 +49,9 @@ struct Event {
 		UCEvent ucEvent;
 		ActionEvent actionEvent;
 		MessageEvent messageEvent;
-		DestinationEvent destinationEvent;
+		ETAEvent etaEvent;
+		WaitEvent waitEvent;
+		SpeedChangeEvent speedChangeEvent;
 
 		contents(BoxEvent boxEvent) {
 			this->boxEvent = boxEvent;
@@ -56,8 +65,14 @@ struct Event {
 		contents(MessageEvent messageEvent) {
 			this->messageEvent = messageEvent;
 		}
-		contents(DestinationEvent destinationEvent) {
-			this->destinationEvent = destinationEvent;
+		contents(ETAEvent etaEvent) {
+			this->etaEvent = etaEvent;
+		}
+		contents(WaitEvent waitEvent) {
+			this->waitEvent = waitEvent;
+		}
+		contents(SpeedChangeEvent speedChangeEvent) {
+			this->speedChangeEvent = speedChangeEvent;
 		}
 	} data;
 };

@@ -10,6 +10,7 @@
 #endif
 
 #include <vector>
+#include <ctime>
 #include <windows.h>
 
 #include "Unit.h"
@@ -20,6 +21,16 @@
 //set-up
 float win_width = 1000;
 float win_height = 1000;
+
+float theta = 1.56999886;
+float radius = 30;
+
+float xpos = radius * cos(theta);
+float ypos = 0;
+float zpos = radius * sin(theta) - 20;
+float xdir = -cos(theta);
+float ydir = 0;
+float zdir = -20 - sin(theta);
 
 //fps
 LARGE_INTEGER frequency;
@@ -76,6 +87,7 @@ void init_scene() {
 	for (int i = 0; i < global_num_units; i++) {
 		globalEnvironment.add_unit(i);
 	}
+	globalEnvironment.init_prev_end_timestamp();
 }
 
 void drawBox(void) {
@@ -91,10 +103,12 @@ void display(void)
 	glPolygonMode(GL_LINE, GL_FILL);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
 	int* camera = globalEnvironment.get_camera();
 	int* look = globalEnvironment.get_look();
-	gluLookAt(camera[0], camera[1], camera[2], look[0], look[1], look[2], 0, 1, 0);
 
+	//gluLookAt(camera[cX], camera[cY], camera[cZ], look[cX], look[cY], look[cZ], 0, 1, 0);
+	gluLookAt(xpos, ypos, zpos, xdir, ydir, zdir, 0, 1, 0);
 	drawBox();
 
 	globalEnvironment.process();
@@ -110,22 +124,68 @@ void reshape(int w, int h){
 	glutPostRedisplay();
 }
 
+void rotate_left() {
+	theta += 0.01;
+
+	xpos = radius * cos(theta);
+	ypos = 0;
+	zpos = radius * sin(theta) - 20;
+	xdir = -cos(theta);
+	ydir = 0;
+	zdir = -20 - sin(theta);
+}
+
+void rotate_right() {
+	theta -= 0.01;
+
+	xpos = radius * cos(theta);
+	ypos = 0;
+	zpos = radius * sin(theta) - 20;
+	xdir = -cos(theta);
+	ydir = 0;
+	zdir = -20 - sin(theta);
+}
+
+void decrease_radius() {
+	radius -= 0.1;
+	xpos = radius * cos(theta);
+	ypos = 0;
+	zpos = radius * sin(theta) - 20;
+	xdir = -cos(theta);
+	ydir = 0;
+	zdir = -20 - sin(theta);
+}
+
+void increase_radius() {
+	radius += 0.1;
+	xpos = radius * cos(theta);
+	ypos = 0;
+	zpos = radius * sin(theta) - 20;
+	xdir = -cos(theta);
+	ydir = 0;
+	zdir = -20 - sin(theta);
+}
+
 void keyboard(unsigned char key, int x, int y) {
 	switch (key) {
 	case 27: // Escape key
 		exit(0); 
 		break;
 	case 97: //a - decr. x
-		globalEnvironment.change_view(97);
+		rotate_left();
+			 //globalEnvironment.change_view(97);
 		break;
 	case 100: //d - incr. x
-		globalEnvironment.change_view(100);
+		rotate_right();
+			  //globalEnvironment.change_view(100);
 		break;
 	case 119: //w - incr. y
-		globalEnvironment.change_view(119);
+		decrease_radius();
+			  //globalEnvironment.change_view(119);
 		break;
 	case 115: //s - decr. y
-		globalEnvironment.change_view(115);
+		increase_radius();
+			  //globalEnvironment.change_view(115);
 		break;
 	case 101: //e - decr. z
 		globalEnvironment.change_view(101);
@@ -148,7 +208,7 @@ int main(int argc, char * argv[])
 
 	glutCreateWindow("droneSim");
 
-	globalEnvironment.init_prev_end_timestamp();
+	//sglobalEnvironment.init_prev_end_timestamp();
 	init();
 
 	

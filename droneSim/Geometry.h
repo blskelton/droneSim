@@ -19,18 +19,47 @@ struct Plane {
 struct Box {
 	int positions[3];
 	bool in_container;
+	Box(int xPos, int yPos, int zPos, int boundaries[6]) {
+		positions[cX] = xPos;
+		positions[cY] = yPos;
+		positions[cZ] = zPos;
+		in_container = true;
+		if (xPos<boundaries[0] || xPos>boundaries[1]) {
+			in_container = false;
+		}
+		if (yPos<boundaries[2] || yPos>boundaries[3]) {
+			in_container = false;
+		}
+		if (zPos<boundaries[4] || zPos>boundaries[5]) {
+			in_container = false;
+		}
+	}
+	Box(int xPos, int yPos, int zPos, bool in_container) {
+		positions[cX] = xPos;
+		positions[cY] = yPos;
+		positions[cZ] = zPos;
+		in_container = in_container;
+	}
+	Box() {
+	}
 };
 
-/*struct box_hash {
-	template<class T1, class T2, class T3, class T4> 
-	std::size_t operator() (const Box(T1, T2, T3, T4) &box) const
-	{
-		std::size_t h1 = std::hash<T1>()(box.positions[0]);
-		std::size_t h2 = std::hash<T2>()(box.positions[1]);
-		std::size_t h3 = std::hash<T3>()(box.positions[2]);
-		return h1 ^ h2 ^ h3; 
-	}
-};*/
+inline bool operator==(const Box& first, const Box& second) {
+	return (first.positions[cX] == second.positions[cX] && first.positions[cY] == second.positions[cY] && first.positions[cZ] == second.positions[cZ]);
+}
+
+namespace std {
+	template<>
+	struct hash<Box> {
+		std::size_t operator() (const Box &box) const
+		{
+			std::size_t h1 = std::hash<int>{}(box.positions[0]);
+			std::size_t h2 = std::hash<int>{}(box.positions[1]);
+			std::size_t h3 = std::hash<int>{}(box.positions[2]);
+			return h1 ^ h2 ^ h3;
+		}
+	};
+}
 
 struct myVector {
 	float vals[3];

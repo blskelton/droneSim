@@ -9,7 +9,7 @@ class Container;
 extern Environment globalEnvironment;
 extern Container globalContainer;
 
-extern constexpr int global_num_units = 50;
+extern constexpr int global_num_units = 40;
 
 extern constexpr int cX = 0;
 extern constexpr int cY = 1;
@@ -19,8 +19,16 @@ extern constexpr int BOX_EVENT = 0;
 extern constexpr int UC_EVENT = 1;
 extern constexpr int ACTION_EVENT = 2;
 extern constexpr int MESSAGE_EVENT = 3;
-extern constexpr int DESTINATION_EVENT = 4;
+extern constexpr int ETA_EVENT = 4;
+extern constexpr int WAIT_EVENT = 5;
+extern constexpr int SPEED_CHANGE_EVENT = 6;
+
+extern constexpr float GREEN[3] = { (float)0.053, (float)0.51, (float)0.147 }; //base color
+extern constexpr float YELLOW[3] = {1,1,0}; //in collision avoidance
+extern constexpr float RED[3] = {1,0,0}; //collided core
+extern constexpr float WHITE[3] = {1,1,1}; //reached destination
 
 extern constexpr int TARGET_FPS = 24;
+//extern constexpr float M_PI = 3.14159265359;
 
 #endif /* simulator_h */
