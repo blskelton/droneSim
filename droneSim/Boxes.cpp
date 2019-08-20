@@ -57,62 +57,37 @@ Boxes::~Boxes()
 	//if using malloc to initialize arrays, free here!
 }
 
-//returns a vector of all 8 boxes (including current box) in the path of the given unit
-void Boxes::get_future_boxes(Unit& unit, Box (&arr)[8]) {
+//returns a vector of all boxes (including current box) in the path of the given unit
+void Boxes::get_future_boxes(Unit& unit, Box (&arr)[27]) {
 	Box& myBox = get_box(unit);
 	int xIndex = myBox.positions[cX];
 	int yIndex = myBox.positions[cY];
 	int zIndex = myBox.positions[cZ];
-	
-	int xDir = -1;
-	int yDir = -1;
-	int zDir = -1;
-
-	if (unit.get_direction()[cX] >= 0) {
-		xDir = 1;
-	}
-	if (unit.get_direction()[cY] >= 0) {
-		yDir = 1;
-	}
-	if (unit.get_direction()[cZ] >= 0) {
-		zDir = 1;
-	}
-	
 
 	int boundaries[6] = { 0, m_boxes_per_side[cX] - 1, 0, m_boxes_per_side[cY] - 1, 0, m_boxes_per_side[cZ] - 1 };
 
-	arr[0] = { xIndex, yIndex, zIndex, boundaries }; 
-	arr[1] = { xIndex + xDir, yIndex, zIndex, boundaries };
-	arr[2] = { xIndex + xDir, yIndex + yDir, zIndex, boundaries };
-	arr[3] = { xIndex + xDir, yIndex, zIndex + zDir,boundaries };
-	arr[4] = { xIndex + xDir, yIndex + yDir, zIndex + zDir,boundaries };
-	arr[5] = { xIndex, yIndex + yDir, zIndex,boundaries}; 
-	arr[6] = { xIndex, yIndex + yDir, zIndex + zDir,boundaries };
-	arr[7] = { xIndex, yIndex, zIndex + zDir,boundaries };
+	vector<Box> boxes;
+	int counter = 0;
+
+	for (int x = -1; x < 2; x++) {
+		for (int y = -1; y < 2; y++) {
+			for (int z = -1; z < 2; z++) {
+				Box box = { xIndex + x, yIndex + y, zIndex+z, boundaries };
+				arr[counter] = box;
+				counter++;
+			}
+		}
+	}
 }
 
 bool Boxes::has_neighbors(Unit& unit) {
-	Box possible_boxes[8];
+	Box box = get_box(unit);
 	int my_id = unit.get_id();
-	get_future_boxes(unit, possible_boxes);
-	for (Box box : possible_boxes) {
-		if (box.in_container) {
-			for (int i = 0; i < global_num_units; i++) {
-				if (m_unit_membership[box.positions[cX]][box.positions[cY]][box.positions[cZ]][i]) {
-					if (i != my_id) {
-						return true;
-					}
-				}
-			}
-		}
-
-		else {
-			std::array<bool, global_num_units> membership_array = m_membership_map[{box.positions[cX], box.positions[cY], box.positions[cZ], false}];
-			for (int i = 0; i < global_num_units; i++) {
-				if (membership_array[i]) {
-					if (i != my_id) {
-						return true;
-					}
+	if (box.in_container) {
+		for (int i = 0; i < global_num_units; i++) {
+			if (m_unit_membership[box.positions[cX]][box.positions[cY]][box.positions[cZ]][i]) {
+				if (i != my_id) {
+					return true;
 				}
 			}
 		}
@@ -121,14 +96,7 @@ bool Boxes::has_neighbors(Unit& unit) {
 }
 
 void Boxes::add_collisions(Unit& unit, std::priority_queue<Event, vector<Event>, myEventComparator> &pq) {
-	//get IDs of all eligible units
-	vector<int> neighbors;
-	/*for (int i = 0; i < global_num_units; i++) {
-			if (i != unit.get_id()) {
-				generate_collision_event(unit, i, pq);
-			}
-		}*/
-	Box possible_boxes[8];
+	Box possible_boxes[27];
 	get_future_boxes(unit, possible_boxes);
 	for (Box box : possible_boxes) {
 		if (box.in_container) {
@@ -140,14 +108,11 @@ void Boxes::add_collisions(Unit& unit, std::priority_queue<Event, vector<Event>,
 				}
 			}
 		}
-
 		else {
 			std::array<bool, global_num_units> membership_array = m_membership_map[{box.positions[cX], box.positions[cY], box.positions[cZ],false}];
 			for (int i = 0; i < global_num_units; i++) {
-				if (membership_array[i]) {
-					if (i != unit.get_id()) {
-						generate_collision_event(unit, i, pq);
-					}
+				if (i != unit.get_id()) {
+					generate_collision_event(unit, i, pq);
 				}
 			}
 		}
@@ -194,7 +159,7 @@ void Boxes::get_plane_info(Plane plane, myVector &normal, myVector &point) {
 	}
 }
 
-Event Boxes::get_next_box_event(Unit& unit) {
+void Boxes::get_next_box_event(Unit& unit, std::priority_queue<Event, vector<Event>, myEventComparator>& event_queue) {
 	Box& box = get_box(unit);
 	Plane right, left, top, bottom, nearPlane, farPlane;
 
@@ -237,7 +202,7 @@ Event Boxes::get_next_box_event(Unit& unit) {
 	float min = INFINITY;
 	Plane currPlane;
 	Plane closestPlane;
-	//eliminate planes in opposite direction
+	
 	if (unit.get_direction()[cX] >= 0) {
 		currPlane = right;
 		float time = time_to_plane(unit, currPlane);
@@ -297,122 +262,5 @@ Event Boxes::get_next_box_event(Unit& unit) {
 	float intersectionTime = unit.calc_intersection_time(min);
 	BoxEvent data = { unit.get_id(), unit.get_age(), box, containerCollision };
 	Event event = { BOX_EVENT, intersectionTime, {data} };
-	return event;
-
+	event_queue.emplace(event);
 }
-
-/*Event Boxes::get_next_box_event(Unit& unit) {
-	int unitID = unit.get_id();
-
-	//from unit, get candidate planes
-	Box prevBox = get_box(unit);
-	std::array<int, 3> position_array = { prevBox.positions[0], prevBox.positions[1],prevBox.positions[2] };
-
-	Plane right, left, top, bottom, nearPlane, farPlane;
-
-	right = m_plane_map[position_array][0];
-	left = m_plane_map[position_array][1];
-	top = m_plane_map[position_array][2];
-	bottom = m_plane_map[position_array][3];
-	nearPlane = m_plane_map[position_array][4];
-	farPlane = m_plane_map[position_array][5];
-
-	float min = INFINITY;
-	Plane currPlane;
-	Plane closestPlane;
-	//eliminate planes in opposite direction
-	if (unit.get_direction()[cX] >= 0) {
-		currPlane = right;
-		float time = time_to_plane(unit, currPlane);
-		if (time < min) {
-			closestPlane = right;
-			min = time;
-		}
-	}
-	if (unit.get_direction()[cX] < 0) {
-		currPlane = left;
-		float time = time_to_plane(unit, currPlane);
-		if (time < min) {
-			closestPlane = left;
-			min = time;
-		}
-	}
-	if (unit.get_direction()[cY] >= 0) {
-		currPlane = top;
-		float time = time_to_plane(unit, currPlane);
-		if (time < min) {
-			closestPlane = top;
-			min = time;
-		}
-	}
-	if (unit.get_direction()[cY] < 0) {
-		currPlane = bottom;
-		float time = time_to_plane(unit, currPlane);
-		if (time < min) {
-			closestPlane = bottom;
-			min = time;
-		}
-	}
-	if (unit.get_direction()[cZ] >= 0) {
-		currPlane = nearPlane;
-		float time = time_to_plane(unit, currPlane);
-		if (time < min) {
-			closestPlane = nearPlane;
-			min = time;
-		}
-	}
-	if (unit.get_direction()[cZ] < 0) {
-		currPlane = farPlane;
-		float time = time_to_plane(unit, currPlane);
-		if (time < min) {
-			closestPlane = farPlane;
-			min = time;
-		}
-	}
-	bool containerCollision = false;
-
-	for (Plane plane : m_bounding_planes) {
-		if (closestPlane.equals(plane)) {
-			containerCollision = true;
-		}
-	}
-
-	float intersectionTime = unit.calc_intersection_time(min);
-	BoxEvent data = { unitID, unit.get_age(), prevBox, containerCollision };
-	Event event = { BOX_EVENT, intersectionTime, {data} };
-	return event;
-}*/
-
-std::vector<int> Boxes::get_units_in_box(Unit& unit) {
-	Box& currBox = get_box(unit);
-	vector<int> neighborIDs;
-	if (currBox.in_container) {
-		for (int i = 0; i < global_num_units; i++) {
-			if (m_unit_membership[currBox.positions[cX]][currBox.positions[cY]][currBox.positions[cZ]][i]) {
-				neighborIDs.emplace_back(i);
-			}
-		}
-		return neighborIDs;
-	}
-	else {
-		std::array<bool, global_num_units> membership_array = m_membership_map[currBox];
-		for (int i = 0; i < global_num_units; i++) {
-			if (membership_array[i]) {
-				neighborIDs.emplace_back(i);
-			}
-		}
-		return neighborIDs;
-	}
-	
-}
-
-/*std::vector<int> Boxes::get_units_in_box(Box box, vector<int>& vector_of_IDs) {
-	vector<int> neighborIDs;
-	for (int a = 0; a < global_num_units; a++) {
-		if (m_unit_membership[box.positions[cX]][box.positions[cY]][box.positions[cZ]][a]) {
-			neighborIDs.emplace_back(a);
-			//vector_of_IDs.emplace_back(a);
-		}
-	}
-	return neighborIDs;
-}*/

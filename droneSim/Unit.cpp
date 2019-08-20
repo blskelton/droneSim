@@ -10,12 +10,11 @@
 Unit::Unit() {
 }
 
-Unit::Unit(int i) : m_id{ i }, m_acceleration{ 0.001 }, m_saw_collision(-1), m_goal_speed(0.0075)
+Unit::Unit(int i) : m_id{ i }, m_acceleration{ 0.001 }, m_speed{ 0 }, m_goal_speed(0.0075), m_msgsReceived{ 0 }, m_in_container{ true }, m_stopped{ false }, m_core_collided{ false }
 {
 	for (int j = 0; j < global_num_units; j++) {
 		m_sorted_messages.emplace_back();
 	}	
-	m_msgsReceived = 0;
 	m_color[cX] = GREEN[cX];
 	m_color[cY] = GREEN[cY];
 	m_color[cZ] = GREEN[cZ];
@@ -23,27 +22,36 @@ Unit::Unit(int i) : m_id{ i }, m_acceleration{ 0.001 }, m_saw_collision(-1), m_g
 	m_containerX = globalContainer.get_x_dimension();
 	m_containerY = globalContainer.get_y_dimension();
 	m_containerZ = globalContainer.get_z_dimension();
+	m_farZ = -(globalContainer.get_farZ());
 
-	m_in_container = true;
-	m_stopped = false;
-	m_core_collided = false;
+	int maxX = 1000 * (m_containerX - 2 * m_buffer_radius);
+	int maxY = 1000 * (m_containerY - 2 * m_buffer_radius);
+	int maxZ = 1000 * (m_containerZ - 2 * m_buffer_radius);
 
-	int maxX = 1000 * (m_containerX - 2 * m_bufferRadius);
-	int maxY = 1000 * (m_containerY - 2 * m_bufferRadius);
-	int maxZ = 1000 * (m_containerZ - 2 * m_bufferRadius);
+	m_location[cX] = (float)(rand() % maxX) / 1000 - m_containerX / 2 + m_buffer_radius;
+	m_location[cY] = (float)(rand() % maxY) / 1000 - m_containerY / 2 + m_buffer_radius;
+	m_location[cZ] = (float)(rand() % maxZ) / 1000 - m_farZ + m_buffer_radius;
 
-	m_location[cX] = (float)(rand() % maxX) / 1000 - m_containerX / 2 + m_bufferRadius;
-	m_location[cY] = (float)(rand() % maxY) / 1000 - m_containerY / 2 + m_bufferRadius;
-	m_location[cZ] = (float)(rand() % maxZ) / 1000 - 30 + m_bufferRadius;
-	
-	m_speed = (float)0.00; //distance traveled per ms
-	m_bufferRadius = m_radius * 2;
-	init_destination();
+	m_buffer_radius = m_radius * 2;
+	if (packages) {
+		Package package = globalEnvironment.get_package_info(m_id);
+		set_destination(package.position[cX], package.position[cY]+0.5, package.position[cZ]);
+	}
+	else {
+		init_destination();
+	}
 }
 
 Unit::~Unit()
 {
 	m_sorted_messages.clear();
+}
+
+void Unit::set_destination(float x, float y, float z) {
+	m_destination[cX] = x;
+	m_destination[cY] = y;
+	m_destination[cZ] = z;
+	set_direction();
 }
 
 void Unit::calc_next_location(float loop_time) {
@@ -52,19 +60,9 @@ void Unit::calc_next_location(float loop_time) {
 	m_location[cX] = m_location[cX] + m_direction[cX] * m_speed * t;
 	m_location[cY] = m_location[cY] + m_direction[cY] * m_speed * t;
 	m_location[cZ] = m_location[cZ] + m_direction[cZ] * m_speed * t;
-	if (m_location[cX] < -15 || m_location[cX] > 15) {
-		m_in_container = false;
-	}
-	if (m_location[cY] < -15 || m_location[cY] > 15) {
-		m_in_container = false;
-	}
-	if (m_location[cZ] < -35 || m_location[cZ] > 5) {
-		m_in_container = false;
-	}
 	
 	Box current_box = globalEnvironment.get_box(*this);
 	if (!current_box.in_container) { //has escaped the container
-		//bool var = heading_back(current_box);
 		if (!heading_back()) { //not currently heading back towards container
 			//flip boolean
 			m_in_container = false;
@@ -126,13 +124,15 @@ bool Unit::heading_back() {
 void Unit::reenter_container() {
 	//if in container, update bool, randomize direction, update age and collisions
 	m_in_container = true;
+	increment_age();
 	randomize_direction();
 }
 
 float Unit::calc_intersection_time(float distance) {
 	float time = distance / m_speed;
-	time = max(time, 0.001); //ensure that timestamp does not equal current time
+	time = max(time, 0.1); //ensure that timestamp does not equal current time
 	return globalEnvironment.get_time() + time;
+	
 }
 
 float Unit::calc_arrival_time(float distance) {
@@ -149,7 +149,6 @@ void Unit::update_speed() {
 		if (m_speed > m_goal_speed) {
 			m_speed -= m_acceleration;
 		}
-		//globalEnvironment.recalculate_collisions(*this); //change of speed, must recalculate
 	}
 }
 
@@ -171,13 +170,13 @@ void Unit::set_direction() {
 
 void Unit::init_destination() {
 	//generate new random destination
-	int maxX = 1000 * (m_containerX - 2 * m_bufferRadius);
-	int maxY = 1000 * (m_containerY - 2 * m_bufferRadius);
-	int maxZ = 1000 * (m_containerZ - 2 * m_bufferRadius);
+	int maxX = 1000 * (m_containerX - 2 * m_buffer_radius);
+	int maxY = 1000 * (m_containerY - 2 * m_buffer_radius);
+	int maxZ = 1000 * (m_containerZ - 2 * m_buffer_radius);
 
-	m_destination[cX] = (float)(rand() % maxX)/1000  - m_containerX / 2 + m_bufferRadius;
-	m_destination[cY] = (float)(rand() % maxY)/1000 - m_containerY / 2 + m_bufferRadius;
-	m_destination[cZ] = (float)(rand() % maxZ)/1000  - 30 + m_bufferRadius;
+	m_destination[cX] = (float)(rand() % maxX)/1000  - m_containerX / 2 + m_buffer_radius;
+	m_destination[cY] = (float)(rand() % maxY)/1000 - m_containerY / 2 + m_buffer_radius;
+	m_destination[cZ] = (float)(rand() % maxZ)/1000  - m_farZ + m_buffer_radius;
 
 	set_direction();
 }
@@ -202,6 +201,12 @@ void Unit::handle_eta_event(std::priority_queue<Event, vector<Event>, myEventCom
 		Event waitEvent = { WAIT_EVENT, globalEnvironment.get_time() + wait_time, {data} };
 		pq.emplace(waitEvent);
 		m_stopped = true;
+		if (packages) {
+			int status = globalEnvironment.get_package_status(m_id);
+			if (status == 0 || status == 1) {
+				globalEnvironment.update_package_status(m_id);
+			}
+		}
 	}
 	else { //regenerate destination event - event is in date but not accurate within epsilon
 		generate_eta_event(pq);
@@ -212,17 +217,21 @@ void Unit::handle_wait_event(std::priority_queue<Event, vector<Event>, myEventCo
 	if (!m_core_collided) {
 		set_color(GREEN);
 		m_stopped = false;
-		init_destination();
-		//set_speed((float)0.0075);
+		if (packages) {
+			int status = globalEnvironment.get_package_status(m_id);
+			if (status == 1) {
+				Package package = globalEnvironment.get_package_info(m_id);
+				set_destination(package.destination[cX], package.destination[cY]+0.5, package.destination[cZ]);
+			}
+			if (status == 2) {
+				init_destination();
+			}
+		}
+		else {
+			init_destination();
+		}
 		generate_eta_event(pq);
 	}
-}
-
-void Unit::set_dest(float x_dest, float y_dest, float z_dest) {
-	m_destination[cX] = x_dest;
-	m_destination[cY] = y_dest;
-	m_destination[cZ] = z_dest;
-	set_direction();
 }
 
 float Unit::calc_distance_to_site(float site_x, float site_y, float site_z) {
@@ -256,32 +265,31 @@ void Unit::check_container_collision() {
 
 	bool change_in_direction = false;
 
-	if (particleX - m_bufferRadius <= leftX && m_direction[0] < 0) {
+	if (particleX - m_buffer_radius <= leftX && m_direction[0] < 0) {
 		m_direction[0] = -m_direction[0];
 		change_in_direction = true;
 	}
-	if (particleX + m_bufferRadius >= rightX && m_direction[0] > 0) {
+	if (particleX + m_buffer_radius >= rightX && m_direction[0] > 0) {
 		m_direction[0] = -m_direction[0];
 		change_in_direction = true;
 	}
-	if (particleY - m_bufferRadius <= bottomY && m_direction[1] < 0) {
+	if (particleY - m_buffer_radius <= bottomY && m_direction[1] < 0) {
 		m_direction[1] = -m_direction[1];
 		change_in_direction = true;
 	}
-	if (particleY + m_bufferRadius >= topY && m_direction[1] > 0) {
+	if (particleY + m_buffer_radius >= topY && m_direction[1] > 0) {
 		m_direction[1] = -m_direction[1];
 		change_in_direction = true;
 	}
-	if (particleZ - m_bufferRadius <= farZ && m_direction[2] < 0) {
+	if (particleZ - m_buffer_radius <= farZ && m_direction[2] < 0) {
 		m_direction[2] = -m_direction[2];
 		change_in_direction = true;
 	}
-	if (particleZ + m_bufferRadius >= closeZ && m_direction[2] > 0) {
+	if (particleZ + m_buffer_radius >= closeZ && m_direction[2] > 0) {
 		m_direction[2] = -m_direction[2];
 		change_in_direction = true;
 	}
 	if (change_in_direction) {
-		//m_speed = 0.0;
 		globalEnvironment.recalculate_collisions(*this); //reversed direction to stay in container
 	}
 }
@@ -333,35 +341,41 @@ void Unit::send(Message message, int recvID) {
 }
 
 void Unit::process(float loop_time) {
-	//normalize_direction(); //only call when direction is changed?
+	float traveled_distance = loop_time * m_speed;
+	float max_distance = m_buffer_radius - m_radius;
+	assert(max_distance > traveled_distance);
 	calc_next_location(loop_time);
 	//check for core collision
-	globalEnvironment.check_core_collisions(*this);
+	//globalEnvironment.check_core_collisions(*this);
 	
 }
 
 void Unit::user_process() {
 	globalEnvironment.send_message(m_id, rand() % global_num_units);
 	recv(-1);
-	m_goal_speed = (float)0.0075;
+	//m_goal_speed = (float)0.0075;
+}
+
+float Unit::get_time() {
+	float time = globalEnvironment.get_time();
+	return time;
 }
 
 void Unit::handle_action_event() {
 	if (!m_core_collided) {
-		globalEnvironment.update_collision_status(m_id, false);
 		set_color(GREEN);
 		set_direction();
 	}
 };
 
 void Unit::randomize_location() {
-	int maxX = 1000 * (m_containerX - 2 * m_bufferRadius);
-	int maxY = 1000 * (m_containerY - 2 * m_bufferRadius);
-	int maxZ = 1000 * (m_containerZ - 2 * m_bufferRadius);
+	int maxX = 1000 * (m_containerX - 2 * m_buffer_radius);
+	int maxY = 1000 * (m_containerY - 2 * m_buffer_radius);
+	int maxZ = 1000 * (m_containerZ - 2 * m_buffer_radius);
 
-	m_location[cX] = (float)(rand() % maxX) / 1000 - m_containerX / 2 + m_bufferRadius;
-	m_location[cY] = (float)(rand() % maxY) / 1000 - m_containerY / 2 + m_bufferRadius;
-	m_location[cZ] = (float)(rand() % maxZ) / 1000 - 30 + m_bufferRadius;
+	m_location[cX] = (float)(rand() % maxX) / 1000 - m_containerX / 2 + m_buffer_radius;
+	m_location[cY] = (float)(rand() % maxY) / 1000 - m_containerY / 2 + m_buffer_radius;
+	m_location[cZ] = (float)(rand() % maxZ) / 1000 - m_farZ + m_buffer_radius;
 }
 
 float Unit::unit_collision(int unitID, bool test) {
@@ -386,7 +400,7 @@ float Unit::unit_collision(int unitID, bool test) {
 	myVector velocityDifVector = velocityVectorA.dif(velocityVectorB);
 
 	//sum of radii
-	float radiusSum = m_bufferRadius + unitB.get_buffer_radius();
+	float radiusSum = m_buffer_radius + unitB.get_buffer_radius();
 
 	//distance minus buffer radius sum squared
 	double c = locationVector.dot_product(locationVector) - pow(radiusSum, 2);
@@ -417,8 +431,9 @@ float Unit::unit_collision(int unitID, bool test) {
 		float distance = this->calc_distance_to_site(unitB.get_location()[cX], unitB.get_location()[cY], unitB.get_location()[cZ]);
 	}
 	
+	t = max(0.01, t);
 
-	return t+globalEnvironment.get_time(); //add /speed back in
+	return t+globalEnvironment.get_time();
 	
 }
 
@@ -430,14 +445,13 @@ void Unit::randomize_direction() {
 	globalEnvironment.recalculate_collisions(*this); //change in direction
 }
 
-Event Unit::perform_unit_collision(Unit &unit, std::priority_queue<Event, vector<Event>, myEventComparator> &pq) {
+void Unit::perform_unit_collision(Unit &unit, std::priority_queue<Event, vector<Event>, myEventComparator> &pq) {
 	bool colliding = false;
 	if (unit.get_id() != m_id) {
 		if (is_colliding(unit, false)) { //check for buffer radius collision
-			m_saw_collision = unit.get_id();
 			set_color(YELLOW);
 			colliding = true;
-			float time = m_bufferRadius*2 / m_speed; //number of ms to travel buffer diameter
+			float time = m_buffer_radius*2 / m_speed; //number of ms to travel buffer diameter
 			time += globalEnvironment.get_time();
 			
 			ActionEvent data = { m_id };
@@ -465,21 +479,13 @@ Event Unit::perform_unit_collision(Unit &unit, std::priority_queue<Event, vector
 				normalize_direction();
 			}*/
 
-			globalEnvironment.update_collision_status(m_id, true);
-			globalEnvironment.update_collision_status(unit.get_id(), true);
+		
 			globalEnvironment.recalculate_collisions(*this); //change in direction from collision avoidance
-			ActionEvent newdata = { 1 };
-			Event avoidance = { -1, globalEnvironment.get_time(), newdata };
-			return avoidance;
 		}
 	}
 	if (!colliding) {
 		//attempt to generate a new collision event for the two units
-		//globalEnvironment.recalculate_uc_collision(*this, unit.get_id());
 		//age unit and recalculate
 		globalEnvironment.recalculate_uc_collision(m_id, unit.get_id()); //substitute to age and recalculate. instead, clear curr collisions and recalculate?
-		ActionEvent newdata = { -1 };
-		Event avoidance = { -1, globalEnvironment.get_time(), newdata };
-		return avoidance;
 	}
 }

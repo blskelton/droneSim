@@ -1,5 +1,4 @@
 #include <cmath>
-//#include <boost/geometry.hpp>
 #include <cstdlib>
 #include <array>
 

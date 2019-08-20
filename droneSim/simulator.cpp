@@ -68,7 +68,6 @@ void init(void) {
 void calculateFPS() {
 	LARGE_INTEGER now;
 	QueryPerformanceCounter(&now);
-	//total runtime in milliseconds
 	auto now_ms = ((1000LL * now.QuadPart) / frequency.QuadPart);
 	auto deltaTime = (now_ms-start_time)/1000;
 	actualFPS = (float)g_current_frame_number / deltaTime;
@@ -91,7 +90,9 @@ void init_scene() {
 }
 
 void drawBox(void) {
+	glPushMatrix();
 	globalContainer.draw_container();
+	glPopMatrix();
 }
 
 void display(void)
@@ -104,10 +105,6 @@ void display(void)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	int* camera = globalEnvironment.get_camera();
-	int* look = globalEnvironment.get_look();
-
-	//gluLookAt(camera[cX], camera[cY], camera[cZ], look[cX], look[cY], look[cZ], 0, 1, 0);
 	gluLookAt(xpos, ypos, zpos, xdir, ydir, zdir, 0, 1, 0);
 	drawBox();
 
@@ -171,30 +168,17 @@ void keyboard(unsigned char key, int x, int y) {
 	case 27: // Escape key
 		exit(0); 
 		break;
-	case 97: //a - decr. x
+	case 97: //a
 		rotate_left();
-			 //globalEnvironment.change_view(97);
 		break;
-	case 100: //d - incr. x
+	case 100: //d
 		rotate_right();
-			  //globalEnvironment.change_view(100);
 		break;
-	case 119: //w - incr. y
+	case 119: //w
 		decrease_radius();
-			  //globalEnvironment.change_view(119);
 		break;
-	case 115: //s - decr. y
+	case 115: //s
 		increase_radius();
-			  //globalEnvironment.change_view(115);
-		break;
-	case 101: //e - decr. z
-		globalEnvironment.change_view(101);
-		break;
-	case 113: //q - incr. z
-		globalEnvironment.change_view(113);
-		break;
-	case 99: //c
-		//globalEnvironment.change_view();
 		break;
 	}
 }
@@ -208,10 +192,7 @@ int main(int argc, char * argv[])
 
 	glutCreateWindow("droneSim");
 
-	//sglobalEnvironment.init_prev_end_timestamp();
 	init();
-
-	
 
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);

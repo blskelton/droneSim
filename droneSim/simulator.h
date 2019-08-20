@@ -9,7 +9,7 @@ class Container;
 extern Environment globalEnvironment;
 extern Container globalContainer;
 
-extern constexpr int global_num_units = 40;
+extern constexpr int global_num_units = 135;
 
 extern constexpr int cX = 0;
 extern constexpr int cY = 1;
@@ -29,6 +29,7 @@ extern constexpr float RED[3] = {1,0,0}; //collided core
 extern constexpr float WHITE[3] = {1,1,1}; //reached destination
 
 extern constexpr int TARGET_FPS = 24;
-//extern constexpr float M_PI = 3.14159265359;
+
+extern constexpr bool packages = false;
 
 #endif /* simulator_h */

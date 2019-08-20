@@ -17,42 +17,51 @@ using std::priority_queue;
 class Environment {
 private:
 	priority_queue<Event, vector<Event>, myEventComparator> m_event_queue;
+	std::array<Unit, global_num_units> m_unitArray;
+	Boxes* m_grid;
+
+	//time
 	LARGE_INTEGER m_freq;
-	//start time
 	LARGE_INTEGER m_start_time;
 	float m_prev_loop_end_time;
 	float m_curr_loop_start_time;
-	std::array<Unit, global_num_units> m_unitArray;
-	int m_camera[3];
-	int m_look[3];
-	int m_view;
-	Boxes* m_grid;
-	int max_queue_size;
+	float m_current_time;
+
 	//for random message delay
 	std::random_device m_rd;
 	std::mt19937 e2;
 	std::normal_distribution<> distribution;
-	bool m_units_colliding[global_num_units];
-	int m_speed_change_counter;
-	vector<int> m_neighbors;
 	float m_speed_change_frequency;
-	float m_distance;
-	float m_camera_angle;
-	float lx = 0.0f, lz = -1.0f;
-
-
-	//FOR TESTING
-	vector<float> m_loop_times;
-	vector<float> m_hundred_loop_times;
-	float hundred_loop_start = 0;
-	float testTime;
+	
+	int m_num_packages;
+	Package m_packages[global_num_units];
+	int m_package_statuses[global_num_units];
+	
+	float m_max_loop_distance = 0.25;
 
 public:
 	Environment();
 
 	inline void init_prev_end_timestamp() {
+		QueryPerformanceCounter(&m_start_time);
+		QueryPerformanceFrequency(&m_freq);
+
 		m_prev_loop_end_time = get_num_milliseconds();
-		testTime = m_prev_loop_end_time;
+		m_current_time = m_prev_loop_end_time;
+
+		//write all events into vector of events
+		int size = m_event_queue.size();
+		vector<Event> event_vector;
+		for (int i = 0; i < size; i++) {
+			Event currEvent = m_event_queue.top(); //get current event
+			m_event_queue.pop(); //remove from queue
+			event_vector.emplace_back(currEvent);
+		}
+		for (int i = 0; i < size; i++) {
+			Event currEvent = event_vector[i];
+			currEvent.update_timestamp(m_current_time);
+			m_event_queue.emplace(currEvent);
+		}
 
 		SpeedChangeEvent data = { };
 		float timestamp = m_prev_loop_end_time+m_speed_change_frequency;
@@ -62,17 +71,36 @@ public:
 	};
 
 	inline float get_time() {
-		return testTime;
-		//return m_curr_loop_start_time;
+		return m_current_time;
 	}
 
 	inline int get_message_delay() {
-		int delay = abs(distribution(e2)) * 10;
-		//int vals[100];
-		//for (int i = 0; i < 100; i++) {
-			//vals[i] = ((int)(abs(distribution(e2)) * 10));
-		//}		
+		int delay = abs(distribution(e2)) * 10;	
 		return delay;
+	};
+
+	void initialize_packages();
+
+	void draw_packages();
+
+	inline Package& get_package_info(int id) {
+		Package& package = m_packages[id];
+		return package;
+	};
+
+	inline int get_package_status(int id) {
+		Package& package = m_packages[id];
+		return package.status;
+	}
+
+	inline void update_package_status(int id) {
+		m_packages[id].update_status();
+	}
+
+	inline void get_random_position(int (&numbers)[3]) {
+		numbers[cX] = (rand() % 20) - 10;
+		numbers[cY] = (rand() % 20) - 10;
+		numbers[cZ] = (rand() % 20) - 30;
 	};
 
 	inline void recalculate_collisions(Unit& unit) {//call when unit changes speed or direction
@@ -81,34 +109,34 @@ public:
 		//add new unit collision events
 		m_grid->add_collisions(unit, m_event_queue);
 		//add new box transfer event
-		m_event_queue.emplace(m_grid->get_next_box_event(unit));
-		//can't recalculate destination event; causes infinite loop
+		m_grid->get_next_box_event(unit, m_event_queue);
 	};
 
 	inline void recalculate_uc_collision(int idA, int idB) {
 		Unit& unit = m_unitArray[idA];
-		m_grid->clear_present_collisions(idA, idB);
+		m_grid->remove_collision_tag(idA, idB);
 		m_grid->generate_collision_event(unit, idB, m_event_queue);
 	};
 
 	inline void process() {
 		//update loop time
 		m_curr_loop_start_time = get_num_milliseconds();
-		testTime = m_curr_loop_start_time;
+		m_current_time = m_prev_loop_end_time;
 		float last_milestone = m_prev_loop_end_time;
 		float loop_time = (m_curr_loop_start_time - m_prev_loop_end_time);
-
-		m_loop_times.emplace_back(loop_time);
-		if (m_loop_times.size() == 100) {
-
-		}
-
+		
+		float loop_distance = loop_time * 0.01; //0.01 = max speed
+		//if (loop_distance > m_max_loop_distance) {
+			//int val = 0;
+		//}
 
 		if (m_event_queue.size() > 0) {
 			while (m_event_queue.top().timestamp <= m_curr_loop_start_time) {
-				Event currEvent = m_event_queue.top(); //make event const?
+				Event currEvent = m_event_queue.top();
+
 				float t = currEvent.timestamp - last_milestone;
-				testTime += t;
+				m_current_time += t;
+
 				if (currEvent.tag == BOX_EVENT) {
 					int actual_age = m_unitArray[currEvent.data.boxEvent.id].get_age();
 					if (currEvent.data.boxEvent.age == actual_age) {
@@ -120,22 +148,22 @@ public:
 						m_grid->handle_box_event(currEvent, m_unitArray[currEvent.data.boxEvent.id], m_event_queue);
 					}
 				}
+
 				if (currEvent.tag == UC_EVENT) {
-					int actual_age = m_grid->get_last_collision_age(currEvent.data.ucEvent.idA, currEvent.data.ucEvent.idB);//m_unitArray[currEvent.data.ucEvent.idA].get_age();
+					int actual_age = m_grid->get_last_collision_age(currEvent.data.ucEvent.idA, currEvent.data.ucEvent.idB);
 					if (currEvent.data.ucEvent.ageA == actual_age) {
 						if (t > 0) {
 							for (int i = 0; i < global_num_units; i++) {
 								m_unitArray[i].process(t);
 							}
 						}
-						Unit& unitA = m_unitArray[currEvent.data.ucEvent.idA];
-						Unit& unitB = m_unitArray[currEvent.data.ucEvent.idB];
 						m_grid->handle_uc_event(currEvent, m_unitArray[currEvent.data.ucEvent.idA], m_unitArray[currEvent.data.ucEvent.idB], m_event_queue);
 					}
 					else {
 						recalculate_uc_collision(currEvent.data.ucEvent.idA, currEvent.data.ucEvent.idB);
 					}
 				}
+
 				if (currEvent.tag == ACTION_EVENT) {
 					if (t > 0) {
 						for (int i = 0; i < global_num_units; i++) {
@@ -144,6 +172,7 @@ public:
 					}
 					m_unitArray[currEvent.data.actionEvent.id].handle_action_event();
 				}
+
 				if (currEvent.tag == ETA_EVENT) {
 					int id = currEvent.data.etaEvent.id;
 						if (t > 0) {
@@ -151,15 +180,25 @@ public:
 								m_unitArray[i].process(t);
 							}
 						}
-
 					m_unitArray[id].handle_eta_event(m_event_queue, currEvent.data.etaEvent.epsilon);
 				}
+
 				if (currEvent.tag == WAIT_EVENT) {
+					if (t > 0) {
+						for (int i = 0; i < global_num_units; i++) {
+							m_unitArray[i].process(t);
+						}
+					}
 					int id = currEvent.data.waitEvent.id;
 					m_unitArray[id].handle_wait_event(m_event_queue);
 				}
 
 				if (currEvent.tag == SPEED_CHANGE_EVENT) {
+					if (t > 0) {
+						for (int i = 0; i < global_num_units; i++) {
+							m_unitArray[i].process(t);
+						}
+					}
 					for (Unit& unit : m_unitArray) {
 						unit.update_speed();
 					}
@@ -174,6 +213,7 @@ public:
 				}
 
 				last_milestone += t;
+				m_current_time = last_milestone;
 
 				if (m_event_queue.size() == 0) {
 					return;
@@ -182,49 +222,24 @@ public:
 			}
 		}
 		float time_remaining = m_curr_loop_start_time - last_milestone;
+		m_current_time += time_remaining;
+
 		for (int i = 0; i < global_num_units; i++) {
 			m_unitArray[i].process(time_remaining);
 			draw_unit(m_unitArray[i].get_id());
 			m_unitArray[i].user_process();
+			check_core_collisions(m_unitArray[i]);
 		}
 
-		/*if (m_speed_change_counter == 100) {
-			float dif = m_curr_loop_start_time - hundred_loop_start;
-			hundred_loop_start = m_curr_loop_start_time;
-			m_hundred_loop_times.emplace_back(dif);
-			for (int i = 0; i < global_num_units; i++) {
-				//m_unitArray[i].update_speed();
-			}
-			if (m_hundred_loop_times.size() > 100) {
-				m_hundred_loop_times.clear();
-			}
-			m_speed_change_counter = 0;
+		if (packages) {
+			draw_packages();
 		}
-		//if (m_speed_change_counter == 100) {
-			//m_speed_change_counter = 0;
-		//}
-		m_speed_change_counter++;*/
 		m_prev_loop_end_time = m_curr_loop_start_time;
-
-	};
-
-	inline void update_collision_status(int unitID, bool colliding) {
-		m_units_colliding[unitID] = colliding;
-	};
-
-	inline bool get_collision_status(int unitID) {
-		return m_units_colliding[unitID];
 	};
 
 	void check_core_collisions(Unit&);
 
-	inline void get_collisions(int unitID) {
-		m_grid->add_collisions(m_unitArray[unitID], m_event_queue);
-	};
-
-	inline LARGE_INTEGER get_freq() {
-		return m_freq;
-	};
+	bool check_initial_collisions(int);
 
 	//add unit to array of units
 	void add_unit(int unitID);
@@ -234,20 +249,9 @@ public:
 		return m_unitArray[id];
 	};
 
-	inline int* get_camera() {
-		return m_camera;
-	};
-
-	inline int* get_look() {
-		m_look[cX] = m_camera[cX] + lx;
-		m_look[cZ] = m_camera[cZ] + lz;
-		return m_look;
-	};
-
 	inline float get_num_milliseconds() {
 		LARGE_INTEGER now;
 		QueryPerformanceCounter(&now);
-		m_start_time;
 
 		float dif = (now.QuadPart - m_start_time.QuadPart);
 		dif = dif / m_freq.QuadPart;
@@ -259,21 +263,12 @@ public:
 	}
 
 	inline void add_out_of_container_box_event(Unit& unit, Box& box) {
-		Event new_event = m_grid->get_next_box_event(unit);
-		m_event_queue.emplace(new_event);
+		m_grid->get_next_box_event(unit, m_event_queue);
 	};
-
-	inline void add_to_queue(Event new_event) {
-		m_event_queue.emplace(new_event);
-	};
-
-	void change_view(int);
 	
 	void draw_unit(int);
 	
 	void send_message(int, int);
-	
-	std::vector<int> get_box_neighbors(int);
 };
 
 #endif /*Environment_h*/

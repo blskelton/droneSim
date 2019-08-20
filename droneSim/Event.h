@@ -41,9 +41,8 @@ struct SpeedChangeEvent {
 };
 
 struct Event {
-	int tag; //0 if box, 1 if uc, 2 if action, 3 if message, 4 if destination
+	int tag; 
 	float timestamp;
-	//contents data;
 	union contents {
 		BoxEvent boxEvent;
 		UCEvent ucEvent;
@@ -75,6 +74,9 @@ struct Event {
 			this->speedChangeEvent = speedChangeEvent;
 		}
 	} data;
+	void update_timestamp(float start_time) {
+		timestamp = timestamp + start_time;
+	}
 };
 
 class myEventComparator

@@ -16,6 +16,28 @@ struct Plane {
 	}
 };
 
+struct Package {
+	int position[3];
+	int destination[3];
+	int status;
+
+	void update_status() {
+		status++;
+	}
+
+	Package(int my_position[3], int my_destination[3]) {
+		position[cX] = my_position[cX];
+		position[cY] = my_position[cY];
+		position[cZ] = my_position[cZ];
+		destination[cX] = my_destination[cX];
+		destination[cY] = my_destination[cY];
+		destination[cZ] = my_destination[cZ];
+		status = 0;
+	}
+	Package() {
+	}
+};
+
 struct Box {
 	int positions[3];
 	bool in_container;

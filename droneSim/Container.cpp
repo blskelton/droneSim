@@ -8,7 +8,6 @@
 
 
 Container::Container() {
-	//m_size = GLOBAL_SIZE;
 	m_Xdimension = CONTAINER_X;
 	m_Ydimension = CONTAINER_Y;
 	m_Zdimension = CONTAINER_Z;
@@ -25,8 +24,6 @@ void Container::draw_container() {
 	glPushMatrix();
 
 	glColor3f(1.0, 1.0, 0.0);
-	glTranslatef(globalEnvironment.get_look()[cX], globalEnvironment.get_look()[cY], globalEnvironment.get_look()[cZ]);
-	//glutWireCube(m_Xdimension); //WILL HAVE TO CHANGE
 	glPopMatrix();
 
 	//front
