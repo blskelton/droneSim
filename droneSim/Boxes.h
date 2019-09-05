@@ -51,6 +51,10 @@ public:
 		m_present_collisions[idA][idB] = -1;
 	};
 
+	float get_earliest_collision(Unit& unit, float(&location_array)[3], float(&direction_array)[3]);
+
+	float get_collision_time(Unit&, int);
+
 	inline Box& get_box(Unit& unit) {
 		//get from unit location to box indices
 		float unitX = unit.get_location()[cX];
@@ -112,9 +116,8 @@ public:
 
 	void add_collisions(Unit&, std::priority_queue<Event, vector<Event>, myEventComparator>&);
 
-	inline void generate_collision_event(Unit& unit, int id, std::priority_queue<Event, vector<Event>, myEventComparator>& pq) {
-		float time = unit.get_time();
-		float collisionTime = unit.unit_collision(id, false);
+	inline int generate_collision_event(Unit& unit, int id, std::priority_queue<Event, vector<Event>, myEventComparator>& pq) {
+		float collisionTime = unit.get_uc_timestamp(id);
 		if (collisionTime > 0) {
 			int current_collision_age = m_present_collisions[unit.get_id()][id];
 			if (current_collision_age != unit.get_age()) {
@@ -122,7 +125,9 @@ public:
 				Event collisionEvent = { UC_EVENT, collisionTime, {data} };
 				pq.emplace(collisionEvent);
 				m_present_collisions[unit.get_id()][id] = unit.get_age();
+				return id;
 			}
+			return -1;
 		}
 	};
 
@@ -132,17 +137,13 @@ public:
 	
 	inline void handle_box_event(Event currEvent, Unit& unit, std::priority_queue<Event, vector<Event>, myEventComparator>& event_queue) {
 		Box& box = get_box(unit);
-		if (currEvent.data.boxEvent.containerCollision && unit.get_container_bool()) {
+		if (currEvent.data.boxEvent.containerCollision && unit.get_container_bool()) { //about to cross boundary in -> out
 			unit.check_container_collision();
 		}
-		if (currEvent.data.boxEvent.containerCollision && !unit.get_container_bool()) {
-			if (box.in_container) {
-				unit.reenter_container();
+		if (currEvent.data.boxEvent.containerCollision && !unit.get_container_bool()) { //about to cross boundary out -> in
+			if (box.in_container) { //next box is in container, must reenter
+				unit.reenter_container(); 
 			}
-			else { //not in container
-				get_next_box_event(unit, event_queue);
-			}
-			//if not in container, make another call to get_outside_box_collision
 		}
 
 		//remove old membership

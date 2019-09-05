@@ -36,8 +36,10 @@ private:
 	int m_num_packages;
 	Package m_packages[global_num_units];
 	int m_package_statuses[global_num_units];
+	float m_package_fall_times[global_num_units];
 	
 	float m_max_loop_distance = 0.25;
+	float m_longest_process;
 
 public:
 	Environment();
@@ -93,9 +95,17 @@ public:
 		return package.status;
 	}
 
-	inline void update_package_status(int id) {
-		m_packages[id].update_status();
+	inline void update_package_status(int id, int status) {
+		m_packages[id].update_status(status);
 	}
+
+	inline void drop_package(int id) {
+		m_package_fall_times[id] = m_current_time;
+	}
+
+	inline float get_earliest_collision(Unit& unit, float(&location)[3], float(&direction)[3]) {
+		return m_grid->get_earliest_collision(unit, location, direction);
+	};
 
 	inline void get_random_position(int (&numbers)[3]) {
 		numbers[cX] = (rand() % 20) - 10;
@@ -107,7 +117,12 @@ public:
 		//increment unit age by 1 to invalidate old events
 		unit.increment_age();
 		//add new unit collision events
+		int sizeA = m_event_queue.size();
 		m_grid->add_collisions(unit, m_event_queue);
+		int sizeB = m_event_queue.size();
+		if (sizeB - sizeA > 5) {
+			m_grid->add_collisions(unit, m_event_queue);
+		}
 		//add new box transfer event
 		m_grid->get_next_box_event(unit, m_event_queue);
 	};
@@ -212,6 +227,10 @@ public:
 					m_event_queue.emplace(speed_change_event);
 				}
 
+				if (t > m_longest_process) {
+					m_longest_process = t;
+				}
+
 				last_milestone += t;
 				m_current_time = last_milestone;
 
@@ -231,6 +250,10 @@ public:
 			check_core_collisions(m_unitArray[i]);
 		}
 
+		if (time_remaining > m_longest_process) {
+			m_longest_process = time_remaining;
+		}
+
 		if (packages) {
 			draw_packages();
 		}
@@ -247,6 +270,10 @@ public:
 	//get unit object from id
 	inline Unit& get_unit(int id) {
 		return m_unitArray[id];
+	};
+
+	inline float get_longest_process() {
+		return m_longest_process;
 	};
 
 	inline float get_num_milliseconds() {

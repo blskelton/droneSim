@@ -8,7 +8,7 @@
 #include "Boxes.h"
 
 
-Environment::Environment() : e2{ m_rd() }, distribution{ 100, 100 }, m_speed_change_frequency{ 2000 }, m_num_packages{10}
+Environment::Environment() : e2{ m_rd() }, distribution{ 100, 100 }, m_speed_change_frequency{ 1000 }, m_num_packages{10}, m_longest_process{0}
 {
 	m_grid = new Boxes();
 	if (packages) {
@@ -73,26 +73,40 @@ void Environment::initialize_packages() {
 void Environment::draw_packages() {
 	for (int i = 0; i < m_num_packages; i++) {
 		Package package = m_packages[i];
-		if (package.status == 0) { //draw at init location
+		if (package.status == WAITING_FOR_PICKUP) { //draw at init location
 			glPushMatrix();
 			glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
 			glColor3f(1, 0, 0);
 			glutWireCube(.25);
 			glPopMatrix();
 		}
-		if (package.status == 1) { //draw underneath carrying unit
+		if (package.status == IN_TRANSIT) { //draw underneath carrying unit
 			glPushMatrix();
 			glTranslatef(m_unitArray[i].get_location()[cX], m_unitArray[i].get_location()[cY]-0.5, m_unitArray[i].get_location()[cZ]);
 			glColor3f(0, 0, 1);
 			glutWireCube(0.25);
 			glPopMatrix();
 		}
-		if (package.status == 2) { //draw at destination
+		if (package.status == AT_DESTINATION) { //draw at destination
 			glPushMatrix();
 			glTranslatef(package.destination[cX], package.destination[cY], package.destination[cZ]);
 			glColor3f(0, 0, 1);
 			glutWireCube(.25);
 			glPopMatrix();
+		}
+		if (package.status == DROPPED) {
+			float time_offset = m_current_time - m_package_fall_times[i];
+			float new_y = m_unitArray[i].get_location()[cY] - 0.5 - (time_offset * 0.0075);
+			glPushMatrix();
+			if (new_y <= globalContainer.get_bottomY()) {
+				new_y = globalContainer.get_bottomY();
+			}
+			glTranslatef(m_unitArray[i].get_location()[cX], new_y, m_unitArray[i].get_location()[cZ]);
+			
+			glColor3f(1, 0, 0);
+			glutWireCube(.25);
+			glPopMatrix();
+
 		}
 	}
 }

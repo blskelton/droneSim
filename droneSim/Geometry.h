@@ -4,6 +4,11 @@
 #ifndef Geometry_h
 #define Geometry_h
 
+extern constexpr int WAITING_FOR_PICKUP = 0;
+extern constexpr int IN_TRANSIT = 1;
+extern constexpr int AT_DESTINATION = 2;
+extern constexpr int DROPPED = 3;
+
 struct Plane {
 	int coordinate;
 	float offset;
@@ -21,8 +26,8 @@ struct Package {
 	int destination[3];
 	int status;
 
-	void update_status() {
-		status++;
+	void update_status(int new_status) {
+		status = new_status;
 	}
 
 	Package(int my_position[3], int my_destination[3]) {

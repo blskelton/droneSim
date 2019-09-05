@@ -53,7 +53,7 @@ private:
 	int m_id;
 
 	//outer radius
-	float m_buffer_radius = m_radius*3;
+	float m_buffer_radius = DEFAULT_RADIUS * 1.5;
 
 	//container dimensions
 	int m_containerX;
@@ -66,6 +66,7 @@ private:
 
 public:
 	static constexpr float DEFAULT_RADIUS = 0.25;
+
 	Unit(int);
 
 	Unit();
@@ -85,6 +86,8 @@ public:
 		stop_unit();
 		set_color(RED);
 	}
+
+	void collision_avoidance();
 
 	void reenter_container();
 
@@ -140,7 +143,9 @@ public:
 
 	float get_time();
 
-	float unit_collision(int, bool);
+	float get_uc_timestamp(int);
+
+	float get_direction_intersection_time(int, float(&direction_array)[3], float(&location_array)[3]);
 
 	void process_msg(Message);
 
@@ -153,7 +158,7 @@ public:
 	};	
 
 	//updates location
-	void calc_next_location(float);
+	void update_location(float);
 
 	//returns color
 	inline float* get_color() {
@@ -243,9 +248,23 @@ public:
 		m_stopped = true;
 	};
 
-	void randomize_location();
+	inline float get_acceleration() {
+		return m_acceleration;
+	};
 
-	void set_speed(float);
+	inline void get_random_direction(float(&direction_array)[3]) {
+		direction_array[cX] = ((float)(rand() % 201)) - 100;
+		direction_array[cY] = ((float)(rand() % 201)) - 100;
+		direction_array[cZ] = ((float)(rand() % 201)) - 100;
+
+		float sum = abs(direction_array[cX]) + abs(direction_array[cY]) + abs(direction_array[cZ]);
+
+		direction_array[cX] = direction_array[cX] / sum;
+		direction_array[cY] = direction_array[cY] / sum;
+		direction_array[cZ] = direction_array[cZ] / sum;
+	};
+
+	void randomize_location();
 
 	void send(Message, int);
 
