@@ -4,15 +4,18 @@
 #ifndef Geometry_h
 #define Geometry_h
 
+//package statuses
 extern constexpr int WAITING_FOR_PICKUP = 0;
 extern constexpr int IN_TRANSIT = 1;
 extern constexpr int AT_DESTINATION = 2;
 extern constexpr int DROPPED = 3;
 
+//coordinate plane defined by the coordinate it is in and its offset in that direction
 struct Plane {
 	int coordinate;
 	float offset;
 
+	//plane test for equality
 	bool equals(Plane secondPlane) {
 		if (coordinate == secondPlane.coordinate && offset == secondPlane.offset) {
 			return true;
@@ -21,15 +24,17 @@ struct Plane {
 	}
 };
 
+//package for units to relocate
 struct Package {
-	int position[3];
-	int destination[3];
+	int position[3]; //initial position
+	int destination[3]; //goal position
 	int status;
 
 	void update_status(int new_status) {
 		status = new_status;
 	}
 
+	//constructor
 	Package(int my_position[3], int my_destination[3]) {
 		position[cX] = my_position[cX];
 		position[cY] = my_position[cY];
@@ -43,9 +48,12 @@ struct Package {
 	}
 };
 
+//sub-box for collision detection efficiency
 struct Box {
+	//box indices
 	int positions[3];
 	bool in_container;
+	//constructor if container status is unknown
 	Box(int xPos, int yPos, int zPos, int boundaries[6]) {
 		positions[cX] = xPos;
 		positions[cY] = yPos;
@@ -61,6 +69,7 @@ struct Box {
 			in_container = false;
 		}
 	}
+	//constructor if container status is known
 	Box(int xPos, int yPos, int zPos, bool in_container) {
 		positions[cX] = xPos;
 		positions[cY] = yPos;
@@ -71,6 +80,7 @@ struct Box {
 	}
 };
 
+//box comparator for hashmap
 inline bool operator==(const Box& first, const Box& second) {
 	return (first.positions[cX] == second.positions[cX] && first.positions[cY] == second.positions[cY] && first.positions[cZ] == second.positions[cZ]);
 }
@@ -88,6 +98,7 @@ namespace std {
 	};
 }
 
+//vector with basic vector operations
 struct myVector {
 	float vals[3];
 	

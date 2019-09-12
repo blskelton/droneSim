@@ -1,3 +1,19 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #include <unordered_map>
 #include <map>
 #include <cmath>
@@ -47,14 +63,15 @@ public:
 
 	virtual ~Boxes();
 
+	//resets tracked collisions for a pair of units
 	inline void remove_collision_tag(int idA, int idB) {
 		m_present_collisions[idA][idB] = -1;
 	};
 
-	float get_earliest_collision(Unit& unit, float(&location_array)[3], float(&direction_array)[3]);
+	//calculates earliest collision with test direction
+	float get_earliest_collision(Unit& unit, float(&location_array)[3], float(&direction_array)[3], int);
 
-	float get_collision_time(Unit&, int);
-
+	//calculates box and updates membership
 	inline Box& get_box(Unit& unit) {
 		//get from unit location to box indices
 		float unitX = unit.get_location()[cX];
@@ -114,8 +131,10 @@ public:
 		}
 	};
 
+	//adds collisions with any units in neighboring boxes
 	void add_collisions(Unit&, std::priority_queue<Event, vector<Event>, myEventComparator>&);
 
+	//gets collision timestamp and generates event if necessary
 	inline int generate_collision_event(Unit& unit, int id, std::priority_queue<Event, vector<Event>, myEventComparator>& pq) {
 		float collisionTime = unit.get_uc_timestamp(id);
 		if (collisionTime > 0) {
@@ -131,10 +150,13 @@ public:
 		}
 	};
 
+	//populates parameter array with 27 neighboring boxes
 	void get_future_boxes(Unit&, Box(&arr)[27]);
 
+	//returns true if a unit has neighbors
 	bool has_neighbors(Unit&);
 	
+	//updates container information if necessary, removes old membership, adds new box and collision events
 	inline void handle_box_event(Event currEvent, Unit& unit, std::priority_queue<Event, vector<Event>, myEventComparator>& event_queue) {
 		Box& box = get_box(unit);
 		if (currEvent.data.boxEvent.containerCollision && unit.get_container_bool()) { //about to cross boundary in -> out
@@ -160,18 +182,23 @@ public:
 		add_collisions(unit, event_queue);
 	};
 
+	//calls method in unit class to handle collisions
 	inline void handle_uc_event(Event currEvent, Unit& unitA, Unit& unitB, std::priority_queue<Event, vector<Event>, myEventComparator>& event_queue) {
 		unitA.perform_unit_collision(unitB, event_queue);
 	};
 
+	//accesses most recently logged collision given a pair of units
 	inline int get_last_collision_age(int idA, int idB) {
 		return m_present_collisions[idA][idB];
 	};
 	
+	//adds next box transition event to the pq
 	void get_next_box_event(Unit&, std::priority_queue<Event, vector<Event>, myEventComparator>&);
 	
+	//calculates the milliseconds it will take a unit before it intersects with a plane
 	float time_to_plane(Unit&, Plane);
 	
+	//populates vectors with plane information
 	void get_plane_info(Plane, myVector&, myVector&);
 };
 

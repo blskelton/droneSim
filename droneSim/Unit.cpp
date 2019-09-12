@@ -10,7 +10,7 @@
 Unit::Unit() {
 }
 
-Unit::Unit(int i) : m_id{ i }, m_speed{ 0.00 }, m_goal_speed(0.0075), m_msgsReceived{ 0 }, m_in_container{ true }, m_stopped{ false }, m_core_collided{ false }
+Unit::Unit(int i) : m_id{ i }, m_status{ 0 }, m_speed{ 0.00 }, m_assignment_id(-1), m_goal_speed(0.0075), m_msgsReceived{ 0 }, m_in_container{ true }, m_stopped{ false }, m_core_collided{ false }
 {
 	for (int j = 0; j < global_num_units; j++) {
 		m_sorted_messages.emplace_back();
@@ -39,8 +39,25 @@ Unit::Unit(int i) : m_id{ i }, m_speed{ 0.00 }, m_goal_speed(0.0075), m_msgsRece
 	m_buffer_radius = DEFAULT_RADIUS * 1.5;
 
 	if (packages) {
-		Package package = globalEnvironment.get_package_info(m_id);
-		set_destination(package.position[cX], package.position[cY]+0.5, package.position[cZ]);
+		//check for unassigned package
+		int assignment_id = 0;
+		int assignment_entry = globalEnvironment.check_assignment(assignment_id);
+
+		while (assignment_entry != -1 && assignment_id < NUMBER_PACKAGES-1) {
+			assignment_id++;
+			assignment_entry = globalEnvironment.check_assignment(assignment_id);
+		}
+
+		if (assignment_entry == -1) {//found open assignment
+			globalEnvironment.update_assignment(assignment_id, m_id);
+			Package package = globalEnvironment.get_package_info(assignment_id);
+			m_assignment_id = assignment_id;
+			set_destination(package.position[cX], package.position[cY] + 0.5, package.position[cZ]);
+		}
+		else { //no open tasks
+			stop_unit();
+			set_color(BLUE);
+		}
 	}
 	else {
 		init_destination();
@@ -50,6 +67,28 @@ Unit::Unit(int i) : m_id{ i }, m_speed{ 0.00 }, m_goal_speed(0.0075), m_msgsRece
 Unit::~Unit()
 {
 	m_sorted_messages.clear();
+}
+
+void Unit::seek_assignment() {
+	//check for unassigned package
+	int assignment_id = 0;
+	int assignment_entry = globalEnvironment.check_assignment(assignment_id);
+
+	while (assignment_entry != -1 && assignment_id < NUMBER_PACKAGES - 1) {
+		assignment_id++;
+		assignment_entry = globalEnvironment.check_assignment(assignment_id);
+	}
+
+	if (assignment_entry == -1) {//found open assignment
+		globalEnvironment.update_assignment(assignment_id, m_id);
+		Package package = globalEnvironment.get_package_info(assignment_id);
+		m_assignment_id = assignment_id;
+		set_destination(package.position[cX], package.position[cY] + 0.5, package.position[cZ]);
+	}
+	else { //no open tasks
+		stop_unit();
+		set_color(BLUE);
+	}
 }
 
 void Unit::set_destination(float x, float y, float z) {
@@ -78,9 +117,6 @@ void Unit::update_location(float loop_time) {
 			m_direction[cZ] = -m_direction[cZ];
 			//age unit
 			globalEnvironment.recalculate_collisions(*this); //reversed direction, must recalculate
-			//add new box collision
-			globalEnvironment.add_out_of_container_box_event(*this, current_box);
-			//m_heading_towards_container = true;
 		}
 	}
 };
@@ -135,14 +171,14 @@ void Unit::reenter_container() {
 	globalEnvironment.recalculate_collisions(*this); //commit change in direction
 }
 
-float Unit::calc_intersection_time(float distance) {
+float Unit::calculate_intersection_time(float distance) {
 	float time = distance / m_speed;
 	time = max(time, 0.1); //ensure that timestamp does not equal current time
 	return globalEnvironment.get_time() + time;
 	
 }
 
-float Unit::calc_arrival_time(float distance) {
+float Unit::calculate_eta(float distance) {
 	float time = distance / max(m_goal_speed, m_speed);
 	time = max(time, 0.001); //ensure that timestamp does not equal current time
 	return globalEnvironment.get_time() + time;
@@ -155,9 +191,6 @@ void Unit::update_speed() {
 		}
 		if (m_speed > m_goal_speed) {
 			m_speed -= m_acceleration;
-		}
-		if (m_speed == 0) {
-			int val = 0;
 		}
 		m_buffer_radius = (m_radius*1.5) + globalEnvironment.get_longest_process() * m_speed;
 	}	
@@ -196,7 +229,7 @@ void Unit::generate_eta_event(std::priority_queue<Event, vector<Event>, myEventC
 	//set_direction();
 	ETAEvent data = { m_id, m_radius };
 	float distance = calc_distance_to_site(m_destination[cX], m_destination[cY], m_destination[cZ]);
-	float timestamp = calc_arrival_time(distance);
+	float timestamp = calculate_eta(distance);
 
 	Event destination_event = { ETA_EVENT, timestamp, {data} };
 	event_queue.emplace(destination_event);
@@ -207,18 +240,20 @@ void Unit::handle_eta_event(std::priority_queue<Event, vector<Event>, myEventCom
 	if (distance_to_destination < epsilon) {
 		stop_unit();
 		set_color(WHITE);
+		m_status = 2;
 		float wait_time = globalEnvironment.get_message_delay(); //rename to reflect multi-purpose?
-		WaitEvent data = { m_id };
+		WaitEvent data = { m_id, RESUME_TOWARDS_DESTINATION };
 		Event waitEvent = { WAIT_EVENT, globalEnvironment.get_time() + wait_time, {data} };
 		pq.emplace(waitEvent);
 		m_stopped = true;
-		if (packages) {
-			int status = globalEnvironment.get_package_status(m_id);
+		if (packages && m_assignment_id>=0) {
+			int status = globalEnvironment.get_package_status(m_assignment_id);
 			if (status == WAITING_FOR_PICKUP){
-				globalEnvironment.update_package_status(m_id, IN_TRANSIT);
+				globalEnvironment.update_package_status(m_assignment_id, IN_TRANSIT);
 			}
 			if (status == IN_TRANSIT) {
-				globalEnvironment.update_package_status(m_id, AT_DESTINATION);
+				globalEnvironment.update_package_status(m_assignment_id, AT_DESTINATION); //completed task, update assignment
+				m_assignment_id = -1;
 			}
 		}
 	}
@@ -227,24 +262,42 @@ void Unit::handle_eta_event(std::priority_queue<Event, vector<Event>, myEventCom
 	}
 }
 
-void Unit::handle_wait_event(std::priority_queue<Event, vector<Event>, myEventComparator>& pq) {
+void Unit::handle_wait_event(std::priority_queue<Event, vector<Event>, myEventComparator>& pq, int tag) {
 	if (!m_core_collided) {
-		set_color(GREEN);
-		m_stopped = false;
-		if (packages) {
-			int status = globalEnvironment.get_package_status(m_id);
-			if (status == 1) {
-				Package package = globalEnvironment.get_package_info(m_id);
-				set_destination(package.destination[cX], package.destination[cY]+0.5, package.destination[cZ]);
+		if (tag == RESUME_TOWARDS_DESTINATION) {
+			set_color(GREEN);
+			m_status = 1;
+			m_stopped = false;
+			if (packages) {
+				int status = globalEnvironment.get_package_status(m_id);
+				if (status == 1) {
+					Package package = globalEnvironment.get_package_info(m_id);
+					set_destination(package.destination[cX], package.destination[cY] + 0.5, package.destination[cZ]);
+				}
+				if (status == 2) {
+					//init_destination();
+				}
 			}
-			if (status == 2) {
-				init_destination();
+			else {
+				//init_destination();
 			}
+			generate_eta_event(pq);
+		}
+	}
+	else if (tag == REATTEMPT_COLLISION_AVOIDANCE) {
+		int val = 9;
+		/*bool found_new_path = collision_avoidance(unit.get_id()); //NEED COLLISION PARTNER ID FUCKKKK
+		if (found_new_path) {
+			ActionEvent data = { m_id };
+			Event new_event = { ACTION_EVENT, time, { data } };
+			pq.emplace(new_event);
+			m_stopped = false;
 		}
 		else {
-			init_destination();
-		}
-		generate_eta_event(pq);
+			WaitEvent data = { m_id, REATTEMPT_COLLISION_AVOIDANCE };
+			Event new_event = { WAIT_EVENT, time, {data} };
+			pq.emplace(new_event);
+		}*/
 	}
 }
 
@@ -362,6 +415,9 @@ void Unit::process(float loop_time) {
 void Unit::user_process() {
 	globalEnvironment.send_message(m_id, rand() % global_num_units);
 	recv(-1);
+	if (m_assignment_id == -1 && m_status == 0) {
+		seek_assignment();
+	}
 	//m_goal_speed = (float)0.0075;
 }
 
@@ -373,6 +429,12 @@ float Unit::get_time() {
 void Unit::handle_action_event() {
 	if (!m_core_collided) {
 		set_color(GREEN);
+		m_status = 0;
+		if (m_assignment_id >= 0) {
+			Package package = globalEnvironment.get_package_info(m_assignment_id);
+			int status = globalEnvironment.get_package_status(m_assignment_id);
+
+		}
 		set_direction();
 	}
 };
@@ -387,15 +449,15 @@ void Unit::randomize_location() {
 	m_location[cZ] = (float)(rand() % maxZ) / 1000 - m_farZ + m_buffer_radius;
 }
 
-float Unit::get_direction_intersection_time(int unitID, float(&direction_array)[3], float(&location_array)[3]) {
+float Unit::get_direction_intersection_time(int unitID, float(&direction_array)[3], bool core_collision) {
 	if (unitID == m_id) {
 		return -1;
 	}
 	Unit& unitB = globalEnvironment.get_unit(unitID);
 	//vector between unit centers
-	myVector locationVector = { location_array[cX] - unitB.get_location()[cX],
-		location_array[cY] - unitB.get_location()[cY],
-		location_array[cZ] - unitB.get_location()[cZ] };
+	myVector locationVector = { m_location[cX] - unitB.get_location()[cX],
+		m_location[cY] - unitB.get_location()[cY],
+		m_location[cZ] - unitB.get_location()[cZ] };
 	//difference in velocity vector (try incorporating speed?)
 	myVector sumDirectionVector = { direction_array[cX] - unitB.get_direction()[cX],
 		direction_array[cY] - unitB.get_direction()[cY],
@@ -409,12 +471,18 @@ float Unit::get_direction_intersection_time(int unitID, float(&direction_array)[
 	myVector velocityDifVector = velocityVectorA.dif(velocityVectorB);
 
 	//sum of radii
-	float radiusSum = m_buffer_radius + unitB.get_buffer_radius();
+	float radiusSum;
+	if (core_collision) {
+		radiusSum = m_radius + unitB.get_radius();
+	}
+	else {
+		radiusSum = m_buffer_radius + unitB.get_buffer_radius();
+	}
 
 	//distance minus buffer radius sum squared
 	double c = locationVector.dot_product(locationVector) - pow(radiusSum, 2);
 	if (c < 0) { //if negative, already overlapping
-		return 0;
+		//return 0;
 	}
 
 	float a = velocityDifVector.dot_product(velocityDifVector);
@@ -493,34 +561,40 @@ void Unit::randomize_direction() {
 	//globalEnvironment.recalculate_collisions(*this); //change in direction
 }
 
-void Unit::collision_avoidance() {
+bool Unit::collision_avoidance(int collision_partner) {
 	float new_direction[3];
 	get_random_direction(new_direction);
-	//randomize_direction(); //try a different random direction
-	float earliest_collision_time = globalEnvironment.get_earliest_collision(*this, m_location, new_direction);
-	//randomize direction
-	/*randomize_direction();
-	//see if any collision in next epsilon ms
-	float earliest_collision_time = globalEnvironment.get_earliest_collision(*this);*/
+	//determines if unit is heading towards current collision partner
+	bool heading_towards_core = globalEnvironment.check_direction(m_id, collision_partner, new_direction);
+	//determines earliest new collision event with given direction
+	float earliest_collision_time = globalEnvironment.get_earliest_collision(*this, m_location, new_direction, collision_partner);
+
 	float current_time = get_time();
 	float offset = earliest_collision_time - current_time;
 	int counter = 0;
-	while (offset < 100) {
-		float new_direction[3];
+	while (offset < 100 || heading_towards_core == true) {
 		get_random_direction(new_direction);
 		//randomize_direction(); //try a different random direction
-		earliest_collision_time = globalEnvironment.get_earliest_collision(*this, m_location, new_direction); 	//see if any collision in next epsilon ms
+		heading_towards_core = globalEnvironment.check_direction(m_id, collision_partner, new_direction);
+		earliest_collision_time = globalEnvironment.get_earliest_collision(*this, m_location, new_direction, collision_partner); 	//see if any collision in next epsilon ms
 		offset = earliest_collision_time - current_time;
 		counter++;
-	}
-	if (counter > 0) {
-		int val = 0;
+		if(counter>20) //unable to find new path
+		{
+			m_status = 1;
+			if (m_assignment_id >= 0) {
+				globalEnvironment.update_assignment(m_assignment_id, -1);
+			}
+			
+			m_assignment_id = -1;
+			return false;
+		}
 	}
 
 	m_direction[cX] = new_direction[cX];
 	m_direction[cY] = new_direction[cY];
 	m_direction[cZ] = new_direction[cZ];
-	return;
+	return true;
 }
 
 void Unit::perform_unit_collision(Unit &unit, std::priority_queue<Event, vector<Event>, myEventComparator> &pq) {
@@ -532,20 +606,30 @@ void Unit::perform_unit_collision(Unit &unit, std::priority_queue<Event, vector<
 			float time = m_buffer_radius*2 / m_speed; //number of ms to travel buffer diameter
 			time += globalEnvironment.get_time();
 			
-			ActionEvent data = { m_id };
-			Event new_event = { ACTION_EVENT, time, { data } };
-			pq.emplace(new_event);
-
-			//stop_unit();
-			collision_avoidance();
-
-			//drop package
-			if (globalEnvironment.get_package_status(m_id) == IN_TRANSIT) {
-				globalEnvironment.update_package_status(m_id, DROPPED);
-				globalEnvironment.drop_package(m_id);
+			stop_unit();
+			bool found_new_path = collision_avoidance(unit.get_id());
+			if (found_new_path) {
+				ActionEvent data = { m_id };
+				Event new_event = { ACTION_EVENT, time, { data } };
+				pq.emplace(new_event);
+				m_stopped = false;
 			}
-		
+			else {
+				WaitEvent data = { m_id, REATTEMPT_COLLISION_AVOIDANCE };
+				Event new_event = { WAIT_EVENT, globalEnvironment.get_time()+100, {data} };
+				pq.emplace(new_event);
+			}
+			//drop package
+			if (packages && m_assignment_id >= 0) {
+				if (globalEnvironment.get_package_status(m_assignment_id) == IN_TRANSIT) {
+					globalEnvironment.update_package_status(m_assignment_id, DROPPED);
+					globalEnvironment.drop_package(m_assignment_id);
+					globalEnvironment.update_assignment(m_assignment_id, -1);
+					m_assignment_id = -1;
+				}
+			}
 			//globalEnvironment.recalculate_collisions(*this); //change in direction from collision avoidance
+			//not necessary - unit is not stopped but speed = 0. moving at all will trigger collision recalculation
 		}
 	}
 	if (!colliding) {

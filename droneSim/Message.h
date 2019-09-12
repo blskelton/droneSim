@@ -25,6 +25,7 @@ public:
 		return m_unitID;
 	};
 
+	//returns msg round
 	inline int get_round() {
 		return m_round;
 	};

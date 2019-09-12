@@ -8,7 +8,7 @@
 #include "Boxes.h"
 
 
-Environment::Environment() : e2{ m_rd() }, distribution{ 100, 100 }, m_speed_change_frequency{ 1000 }, m_num_packages{10}, m_longest_process{0}
+Environment::Environment() : e2{ m_rd() }, distribution{ 100, 100 }, m_speed_change_frequency{ 1000 }, m_longest_process{0}
 {
 	m_grid = new Boxes();
 	if (packages) {
@@ -63,7 +63,7 @@ bool Environment::check_initial_collisions(int id) {
 void Environment::initialize_packages() {
 	int random_location[3];
 	int random_destination[3];
-	for (int i = 0; i < m_num_packages; i++) {
+	for (int i = 0; i < NUMBER_PACKAGES; i++) {
 		get_random_position(random_location);
 		get_random_position(random_destination);
 		m_packages[i] = Package(random_location, random_destination);
@@ -71,7 +71,7 @@ void Environment::initialize_packages() {
 }
 
 void Environment::draw_packages() {
-	for (int i = 0; i < m_num_packages; i++) {
+	for (int i = 0; i < NUMBER_PACKAGES; i++) {
 		Package package = m_packages[i];
 		if (package.status == WAITING_FOR_PICKUP) { //draw at init location
 			glPushMatrix();
@@ -128,8 +128,8 @@ void Environment::draw_unit(int id) {
 	//inside
 	glutSolidSphere(radius, 10, 10);
 	//outside
-	glColor3f((float) 0.35, (float) 0.35, (float) 0.35);
-	glutWireSphere(bufferRadius, 8, 5);
+	glColor4f((float) .5, (float) 0.5, (float) 0.5, .5);
+	glutSolidSphere(bufferRadius, 40,40);
 	glPopMatrix();
 }
 

@@ -4,6 +4,7 @@
 #ifndef Event_h
 #define Event_h
 
+//event for moving from one sub-box to another
 struct BoxEvent {
 	int id;
 	int age;
@@ -11,35 +12,43 @@ struct BoxEvent {
 	bool containerCollision;
 };
 
+//event for unit collision
 struct UCEvent {
 	int idA;
 	int ageA;
 	int idB;
 };
 
+//event for taking an action (esp. with collision avoidance and upon reaching destination)
 struct ActionEvent {
 	int id;
 };
 
+//event for sending a message
 struct MessageEvent {
 	int idA;
 	int idB;
 	Message message;
 };
 
+//event for eta at destination
 struct ETAEvent {
 	int id;
 	float epsilon; //maximum acceptable distance between unit and reached destination
 };
 
+//event to end a wait period
 struct WaitEvent {
 	int id;
+	int tag;
 };
 
+//empty struct to signal a system-wide speed update
 struct SpeedChangeEvent {
 
 };
 
+//struct containing a tag indicating the event contents, a timestamp, and one of the above structs
 struct Event {
 	int tag; 
 	float timestamp;

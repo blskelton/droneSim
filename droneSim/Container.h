@@ -19,11 +19,13 @@ private:
 	int m_farZ;
 
 public:
+	//container dimensions as constant expressions
 	static constexpr int CONTAINER_X = 20;
 	static constexpr int CONTAINER_Y = 20;
 	static constexpr int CONTAINER_Z = 20;
-	Container();
 
+	Container();
+	//methods to access container boundaries and dimensions
 	inline int get_rightX() {
 		return m_rightX;
 	};
@@ -60,6 +62,7 @@ public:
 		return m_Xdimension;
 	}
 
+	//makes gl calls to draw container
 	void draw_container();
 };
 #endif /* Container_h */

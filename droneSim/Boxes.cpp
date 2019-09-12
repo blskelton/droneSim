@@ -127,7 +127,7 @@ void Boxes::add_collisions(Unit& unit, std::priority_queue<Event, vector<Event>,
 	collision_ids.clear();
 }
 
-float Boxes::get_earliest_collision(Unit& unit, float(&location_array)[3], float(&direction_array)[3]) {
+float Boxes::get_earliest_collision(Unit& unit, float(&location_array)[3], float(&direction_array)[3], int collision_partner_id) {
 	//iterate through neighboring boxes and return earliest collision time
 	float earliest_collision = std::numeric_limits<float>::infinity();
 	Box possible_boxes[27];
@@ -136,8 +136,8 @@ float Boxes::get_earliest_collision(Unit& unit, float(&location_array)[3], float
 		if (box.in_container) {
 			for (int i = 0; i < global_num_units; i++) {
 				if (m_unit_membership[box.positions[cX]][box.positions[cY]][box.positions[cZ]][i]) {
-					if (i != unit.get_id()) {
-						float collisionTime = unit.get_direction_intersection_time(i, direction_array, location_array);
+					if (i != unit.get_id() && i != collision_partner_id) {
+						float collisionTime = unit.get_direction_intersection_time(i, direction_array, false);
 
 						if (collisionTime < earliest_collision && collisionTime > 0) {
 							earliest_collision = collisionTime;
@@ -150,7 +150,7 @@ float Boxes::get_earliest_collision(Unit& unit, float(&location_array)[3], float
 		else {
 			std::array<bool, global_num_units> membership_array = m_membership_map[{box.positions[cX], box.positions[cY], box.positions[cZ], false}];
 			for (int i = 0; i < global_num_units; i++) {
-				if (i != unit.get_id()) {
+				if (i != unit.get_id() && i!=collision_partner_id) {
 					float collisionTime = unit.get_uc_timestamp(i);
 					if (collisionTime < earliest_collision&& collisionTime > 0) {
 						earliest_collision = collisionTime;
@@ -304,7 +304,7 @@ void Boxes::get_next_box_event(Unit& unit, std::priority_queue<Event, vector<Eve
 		}
 	}
 
-	float intersectionTime = unit.calc_intersection_time(min);
+	float intersectionTime = unit.calculate_intersection_time(min);
 
 	BoxEvent data = { unit.get_id(), unit.get_age(), box, containerCollision };
 	Event event = { BOX_EVENT, intersectionTime, {data} };

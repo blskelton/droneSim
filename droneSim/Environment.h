@@ -14,10 +14,14 @@
 
 using std::priority_queue;
 
+
 class Environment {
 private:
+	//global event manager
 	priority_queue<Event, vector<Event>, myEventComparator> m_event_queue;
+	//array of units
 	std::array<Unit, global_num_units> m_unitArray;
+	//instance of grid for managing efficient collision detection
 	Boxes* m_grid;
 
 	//time
@@ -33,18 +37,20 @@ private:
 	std::normal_distribution<> distribution;
 	float m_speed_change_frequency;
 	
-	int m_num_packages;
-	Package m_packages[global_num_units];
-	int m_package_statuses[global_num_units];
-	float m_package_fall_times[global_num_units];
+	//for package use case
+	Package m_packages[NUMBER_PACKAGES];
+	int m_package_statuses[NUMBER_PACKAGES];
+	float m_package_fall_times[NUMBER_PACKAGES];
+	std::vector<int> m_package_assignments[NUMBER_PACKAGES];
 	
-	float m_max_loop_distance = 0.25;
+	//longest time between consecutive events (in ms)
 	float m_longest_process;
 
 public:
 	Environment();
 
-	inline void init_prev_end_timestamp() {
+	//call at end of initialization to set up timestamps for current and future events
+	inline void init_prev_end_timestamp() { 
 		QueryPerformanceCounter(&m_start_time);
 		QueryPerformanceFrequency(&m_freq);
 
@@ -65,6 +71,7 @@ public:
 			m_event_queue.emplace(currEvent);
 		}
 
+		//add first speed change event to pq
 		SpeedChangeEvent data = { };
 		float timestamp = m_prev_loop_end_time+m_speed_change_frequency;
 
@@ -72,83 +79,111 @@ public:
 		m_event_queue.emplace(speed_change_event);
 	};
 
+	//returns current time
 	inline float get_time() {
 		return m_current_time;
 	}
 
+	//returns random message delay
 	inline int get_message_delay() {
 		int delay = abs(distribution(e2)) * 10;	
 		return delay;
 	};
 
+	//updates package assignment array
+	inline void update_assignment(int assignment_id, int content) {
+		m_package_assignments[assignment_id].push_back(content);
+	};
+
+	//returns most recent assignment entry
+	inline int check_assignment(int assignment_id) {
+		if (m_package_assignments[assignment_id].size() == 0) {
+			return -1;
+		}
+		return m_package_assignments[assignment_id].back();
+	};
+
+	//sets up packages
 	void initialize_packages();
 
+	//makes gl calls to draw packages
 	void draw_packages();
 
+	//returns a package given its id
 	inline Package& get_package_info(int id) {
 		Package& package = m_packages[id];
 		return package;
 	};
 
+	//returns package status given its id
 	inline int get_package_status(int id) {
 		Package& package = m_packages[id];
 		return package.status;
 	}
 
+	//updates package status to given status
 	inline void update_package_status(int id, int status) {
 		m_packages[id].update_status(status);
 	}
 
+	//writes current time into package_fall_times array for falling animation
 	inline void drop_package(int id) {
 		m_package_fall_times[id] = m_current_time;
 	}
 
-	inline float get_earliest_collision(Unit& unit, float(&location)[3], float(&direction)[3]) {
-		return m_grid->get_earliest_collision(unit, location, direction);
+	//returns timestamp of earliest collision with a test direction
+	inline float get_earliest_collision(Unit& unit, float(&location)[3], float(&direction)[3], int collision_partner_id) {
+		return m_grid->get_earliest_collision(unit, location, direction, collision_partner_id);
 	};
 
+	//populates array with random position within container
 	inline void get_random_position(int (&numbers)[3]) {
 		numbers[cX] = (rand() % 20) - 10;
 		numbers[cY] = (rand() % 20) - 10;
 		numbers[cZ] = (rand() % 20) - 30;
 	};
 
-	inline void recalculate_collisions(Unit& unit) {//call when unit changes speed or direction
+	//updates age and collision information for a unit upon a speed/direction change
+	inline void recalculate_collisions(Unit& unit) {
 		//increment unit age by 1 to invalidate old events
 		unit.increment_age();
 		//add new unit collision events
-		int sizeA = m_event_queue.size();
 		m_grid->add_collisions(unit, m_event_queue);
-		int sizeB = m_event_queue.size();
-		if (sizeB - sizeA > 5) {
-			m_grid->add_collisions(unit, m_event_queue);
-		}
 		//add new box transfer event
 		m_grid->get_next_box_event(unit, m_event_queue);
 	};
 
+	//regenerates collision event with two units
 	inline void recalculate_uc_collision(int idA, int idB) {
 		Unit& unit = m_unitArray[idA];
 		m_grid->remove_collision_tag(idA, idB);
 		m_grid->generate_collision_event(unit, idB, m_event_queue);
 	};
 
+	inline bool check_direction(int idA, int idB, float(&direction)[3]) {
+		Unit& unit = m_unitArray[idA];
+		//m_grid->remove_collision_tag(idA, idB);
+		float collisionTime = unit.get_direction_intersection_time(idB, direction, true);
+		if (collisionTime > -1 && collisionTime < INFINITY) {
+			return true;
+		}
+		return false;
+	};
+
+	//considers and handles all events up to current time
 	inline void process() {
 		//update loop time
 		m_curr_loop_start_time = get_num_milliseconds();
 		m_current_time = m_prev_loop_end_time;
 		float last_milestone = m_prev_loop_end_time;
 		float loop_time = (m_curr_loop_start_time - m_prev_loop_end_time);
-		
-		float loop_distance = loop_time * 0.01; //0.01 = max speed
-		//if (loop_distance > m_max_loop_distance) {
-			//int val = 0;
-		//}
 
 		if (m_event_queue.size() > 0) {
+			//if there is an event with a timestamp in the past, handle it
 			while (m_event_queue.top().timestamp <= m_curr_loop_start_time) {
 				Event currEvent = m_event_queue.top();
-
+				
+				//get time offset and update current time
 				float t = currEvent.timestamp - last_milestone;
 				m_current_time += t;
 
@@ -205,7 +240,11 @@ public:
 						}
 					}
 					int id = currEvent.data.waitEvent.id;
-					m_unitArray[id].handle_wait_event(m_event_queue);
+					int tag = currEvent.data.waitEvent.tag;
+					if (tag == 1) {
+						int val = 1;
+					}
+					m_unitArray[id].handle_wait_event(m_event_queue, tag);
 				}
 
 				if (currEvent.tag == SPEED_CHANGE_EVENT) {
@@ -243,6 +282,7 @@ public:
 		float time_remaining = m_curr_loop_start_time - last_milestone;
 		m_current_time += time_remaining;
 
+		//process all units for time remaining after processing all past events
 		for (int i = 0; i < global_num_units; i++) {
 			m_unitArray[i].process(time_remaining);
 			draw_unit(m_unitArray[i].get_id());
@@ -260,8 +300,10 @@ public:
 		m_prev_loop_end_time = m_curr_loop_start_time;
 	};
 
+	//checks for core collisions
 	void check_core_collisions(Unit&);
 
+	//checks for collisions upon system initialization
 	bool check_initial_collisions(int);
 
 	//add unit to array of units
@@ -272,10 +314,12 @@ public:
 		return m_unitArray[id];
 	};
 
+	//access longest processing period
 	inline float get_longest_process() {
 		return m_longest_process;
 	};
 
+	//update time
 	inline float get_num_milliseconds() {
 		LARGE_INTEGER now;
 		QueryPerformanceCounter(&now);
@@ -285,16 +329,15 @@ public:
 		return dif*1000;
 	};
 
+	//return the box containing a given unit
 	inline Box& get_box(Unit& unit) {
 		return m_grid->get_box(unit);
-	}
-
-	inline void add_out_of_container_box_event(Unit& unit, Box& box) {
-		m_grid->get_next_box_event(unit, m_event_queue);
 	};
 	
+	//calls to gl to draw unit
 	void draw_unit(int);
 	
+	//adds message event to pq
 	void send_message(int, int);
 };
 
