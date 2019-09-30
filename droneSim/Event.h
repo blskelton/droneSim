@@ -1,8 +1,26 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #include "Geometry.h"
 #include "Message.h"
 
 #ifndef Event_h
 #define Event_h
+
+extern constexpr int END_COLLISION_AVOIDANCE = 0;
 
 //event for moving from one sub-box to another
 struct BoxEvent {
@@ -20,9 +38,9 @@ struct UCEvent {
 };
 
 //event for taking an action (esp. with collision avoidance and upon reaching destination)
-struct ActionEvent {
+/*struct ActionEvent {
 	int id;
-};
+};*/
 
 //event for sending a message
 struct MessageEvent {
@@ -43,6 +61,11 @@ struct WaitEvent {
 	int tag;
 };
 
+struct PingEvent {
+	int id;
+	int tag; 
+};
+
 //empty struct to signal a system-wide speed update
 struct SpeedChangeEvent {
 
@@ -55,7 +78,7 @@ struct Event {
 	union contents {
 		BoxEvent boxEvent;
 		UCEvent ucEvent;
-		ActionEvent actionEvent;
+		PingEvent pingEvent;
 		MessageEvent messageEvent;
 		ETAEvent etaEvent;
 		WaitEvent waitEvent;
@@ -67,8 +90,8 @@ struct Event {
 		contents(UCEvent ucEvent) {
 			this->ucEvent = ucEvent;
 		}
-		contents(ActionEvent actionEvent) {
-			this->actionEvent = actionEvent;
+		contents(PingEvent pingEvent) {
+			this->pingEvent = pingEvent;
 		}
 		contents(MessageEvent messageEvent) {
 			this->messageEvent = messageEvent;

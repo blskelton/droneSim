@@ -1,3 +1,19 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #ifdef __APPLE__
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -19,10 +35,10 @@
 #include "simulator.h"
 
 //set-up
-float win_width = 1000;
-float win_height = 1000;
+int win_width = 1000;
+int win_height = 1000;
 
-float theta = 1.56999886;
+float theta = 1.56999886f;
 float radius = 30;
 
 float xpos = radius * cos(theta);
@@ -124,7 +140,7 @@ void reshape(int w, int h){
 }
 
 void rotate_left() {
-	theta += 0.01;
+	theta += 0.01f;
 
 	xpos = radius * cos(theta);
 	ypos = 0;
@@ -135,7 +151,7 @@ void rotate_left() {
 }
 
 void rotate_right() {
-	theta -= 0.01;
+	theta -= 0.01f;
 
 	xpos = radius * cos(theta);
 	ypos = 0;
@@ -146,7 +162,7 @@ void rotate_right() {
 }
 
 void decrease_radius() {
-	radius -= 0.1;
+	radius -= 0.1f;
 	xpos = radius * cos(theta);
 	ypos = 0;
 	zpos = radius * sin(theta) - 20;
@@ -156,7 +172,7 @@ void decrease_radius() {
 }
 
 void increase_radius() {
-	radius += 0.1;
+	radius += 0.1f;
 	xpos = radius * cos(theta);
 	ypos = 0;
 	zpos = radius * sin(theta) - 20;

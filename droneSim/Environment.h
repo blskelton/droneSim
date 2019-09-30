@@ -1,3 +1,19 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #include <unordered_map>
 #include <cassert>
 #include <random>
@@ -86,7 +102,7 @@ public:
 
 	//returns random message delay
 	inline int get_message_delay() {
-		int delay = abs(distribution(e2)) * 10;	
+		int delay = (int)abs(distribution(e2)) * 10;	
 		return delay;
 	};
 
@@ -115,6 +131,14 @@ public:
 		return package;
 	};
 
+	/*inline void update_package_location(int id, float new_location[3]) {
+		m_packages[id].update_location(new_location);
+	};*/
+
+	inline void update_package_carrier(int package_id, int carrier_id) {
+		m_packages[package_id].update_carrier(carrier_id);
+	};
+
 	//returns package status given its id
 	inline int get_package_status(int id) {
 		Package& package = m_packages[id];
@@ -137,10 +161,10 @@ public:
 	};
 
 	//populates array with random position within container
-	inline void get_random_position(int (&numbers)[3]) {
-		numbers[cX] = (rand() % 20) - 10;
-		numbers[cY] = (rand() % 20) - 10;
-		numbers[cZ] = (rand() % 20) - 30;
+	inline void get_random_position(float (&numbers)[3]) {
+		numbers[cX] = (float)(rand() % 20) - 10;
+		numbers[cY] = (float)(rand() % 20) - 10;
+		numbers[cZ] = (float)(rand() % 20) - 30;
 	};
 
 	//updates age and collision information for a unit upon a speed/direction change
@@ -214,13 +238,22 @@ public:
 					}
 				}
 
-				if (currEvent.tag == ACTION_EVENT) {
+				/*if (currEvent.tag == ACTION_EVENT) {
 					if (t > 0) {
 						for (int i = 0; i < global_num_units; i++) {
 							m_unitArray[i].process(t);
 						}
 					}
 					m_unitArray[currEvent.data.actionEvent.id].handle_action_event();
+				}*/
+
+				if (currEvent.tag == PING_EVENT) {
+					if (t > 0) {
+						for (int i = 0; i < global_num_units; i++) {
+							m_unitArray[i].process(t);
+						}
+					}
+					m_unitArray[currEvent.data.pingEvent.id].handle_ping_event(currEvent.data.pingEvent.tag);
 				}
 
 				if (currEvent.tag == ETA_EVENT) {
@@ -324,7 +357,7 @@ public:
 		LARGE_INTEGER now;
 		QueryPerformanceCounter(&now);
 
-		float dif = (now.QuadPart - m_start_time.QuadPart);
+		float dif = (float)(now.QuadPart - m_start_time.QuadPart);
 		dif = dif / m_freq.QuadPart;
 		return dif*1000;
 	};

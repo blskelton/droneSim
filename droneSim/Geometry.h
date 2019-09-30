@@ -1,3 +1,19 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #include <cmath>
 #include "simulator.h"
 
@@ -26,16 +42,40 @@ struct Plane {
 
 //package for units to relocate
 struct Package {
-	int position[3]; //initial position
-	int destination[3]; //goal position
+	float position[3]; //current position
+	float destination[3]; //goal position
 	int status;
+	int carrier;
 
 	void update_status(int new_status) {
 		status = new_status;
+		if (status == AT_DESTINATION) {
+			arrive();
+		}
+	}
+
+	void arrive() {
+		position[cX] = destination[cX];
+		position[cY] = destination[cY];
+		position[cZ] = destination[cZ];
+	}
+
+	void update_carrier(int id) {
+		carrier = id;
+	}
+
+	void update_location(float new_x, float new_y, float new_z) {
+		position[cX] = new_x;
+		position[cY] = new_y;
+		position[cZ] = new_z;
+	}
+
+	void update_y(float new_y) {
+		position[cY] = new_y;
 	}
 
 	//constructor
-	Package(int my_position[3], int my_destination[3]) {
+	Package(float my_position[3], float my_destination[3]) {
 		position[cX] = my_position[cX];
 		position[cY] = my_position[cY];
 		position[cZ] = my_position[cZ];
@@ -43,6 +83,7 @@ struct Package {
 		destination[cY] = my_destination[cY];
 		destination[cZ] = my_destination[cZ];
 		status = 0;
+		carrier = -1;
 	}
 	Package() {
 	}
@@ -70,11 +111,11 @@ struct Box {
 		}
 	}
 	//constructor if container status is known
-	Box(int xPos, int yPos, int zPos, bool in_container) {
+	Box(int xPos, int yPos, int zPos, bool container_bool) {
 		positions[cX] = xPos;
 		positions[cY] = yPos;
 		positions[cZ] = zPos;
-		in_container = in_container;
+		in_container = container_bool;
 	}
 	Box() {
 	}

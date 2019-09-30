@@ -1,3 +1,19 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <vector>
@@ -61,8 +77,8 @@ bool Environment::check_initial_collisions(int id) {
 }
 
 void Environment::initialize_packages() {
-	int random_location[3];
-	int random_destination[3];
+	float random_location[3];
+	float random_destination[3];
 	for (int i = 0; i < NUMBER_PACKAGES; i++) {
 		get_random_position(random_location);
 		get_random_position(random_destination);
@@ -73,41 +89,50 @@ void Environment::initialize_packages() {
 void Environment::draw_packages() {
 	for (int i = 0; i < NUMBER_PACKAGES; i++) {
 		Package package = m_packages[i];
-		if (package.status == WAITING_FOR_PICKUP) { //draw at init location
-			glPushMatrix();
-			glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
-			glColor3f(1, 0, 0);
-			glutWireCube(.25);
-			glPopMatrix();
+		if (package.status == WAITING_FOR_PICKUP) { //draw at init location, don't update location
+			//glPushMatrix();
+			//glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
+			//glColor3f(1, 0, 0);
+			//glutWireCube(.25);
+			//glPopMatrix();
 		}
-		if (package.status == IN_TRANSIT) { //draw underneath carrying unit
-			glPushMatrix();
-			glTranslatef(m_unitArray[i].get_location()[cX], m_unitArray[i].get_location()[cY]-0.5, m_unitArray[i].get_location()[cZ]);
-			glColor3f(0, 0, 1);
-			glutWireCube(0.25);
-			glPopMatrix();
+		if (package.status == IN_TRANSIT) { //draw underneath carrying unit - update location, then draw
+			int carrier_id = package.carrier;
+		//	float* location = m_unitArray[carrier_id].get_location();
+			package.update_location(m_unitArray[carrier_id].get_location()[cX], m_unitArray[carrier_id].get_location()[cY]-0.5f, m_unitArray[carrier_id].get_location()[cZ]);
+			//glPushMatrix();
+			//glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
+			//glColor3f(0, 0, 1);
+			//glutWireCube(0.25);
+			//glPopMatrix();
 		}
 		if (package.status == AT_DESTINATION) { //draw at destination
-			glPushMatrix();
-			glTranslatef(package.destination[cX], package.destination[cY], package.destination[cZ]);
-			glColor3f(0, 0, 1);
-			glutWireCube(.25);
-			glPopMatrix();
+			//glPushMatrix();
+			//glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
+			//glColor3f(0, 0, 1);
+			//glutWireCube(.25);
+			//glPopMatrix();
 		}
 		if (package.status == DROPPED) {
 			float time_offset = m_current_time - m_package_fall_times[i];
-			float new_y = m_unitArray[i].get_location()[cY] - 0.5 - (time_offset * 0.0075);
+			float new_y = m_unitArray[i].get_location()[cY] - 0.5f - (time_offset * 0.0075f);
 			glPushMatrix();
 			if (new_y <= globalContainer.get_bottomY()) {
-				new_y = globalContainer.get_bottomY();
+				new_y = (float)globalContainer.get_bottomY();
 			}
-			glTranslatef(m_unitArray[i].get_location()[cX], new_y, m_unitArray[i].get_location()[cZ]);
-			
-			glColor3f(1, 0, 0);
-			glutWireCube(.25);
-			glPopMatrix();
+			package.update_y(new_y);
+			//glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
+
+			//glColor3f(1, 0, 0);
+			//glutWireCube(.25);
+			//glPopMatrix();
 
 		}
+		glPushMatrix();
+		glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
+		glColor3f(1, 1, 0);
+		glutWireCube(0.25);
+		glPopMatrix();
 	}
 }
 

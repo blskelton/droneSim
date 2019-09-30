@@ -1,3 +1,19 @@
+/*<DroneSim - a simulator graphically modeling drone activity in real time.>
+	Copyright(C) < 2019 > <Blake Skelton>
+
+	This program is free software : you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.If not, see < https://www.gnu.org/licenses/>. */
+
 #include <vector>
 #include <unordered_map>
 #include <map>
@@ -104,7 +120,7 @@ void Boxes::add_collisions(Unit& unit, std::priority_queue<Event, vector<Event>,
 			for (int i = 0; i < global_num_units; i++) {
 				if (m_unit_membership[box.positions[cX]][box.positions[cY]][box.positions[cZ]][i]) {
 					if (i != unit.get_id()) {
-						float id = generate_collision_event(unit, i, pq);
+						int id = generate_collision_event(unit, i, pq);
 						if (id != -1) {
 							collision_ids.emplace_back(i);
 						}
@@ -116,7 +132,7 @@ void Boxes::add_collisions(Unit& unit, std::priority_queue<Event, vector<Event>,
 			std::array<bool, global_num_units> membership_array = m_membership_map[{box.positions[cX], box.positions[cY], box.positions[cZ],false}];
 			for (int i = 0; i < global_num_units; i++) {
 				if (i != unit.get_id()) {
-					float id = generate_collision_event(unit, i, pq);
+					int id = generate_collision_event(unit, i, pq);
 					if (id != -1) {
 						collision_ids.emplace_back(i);
 					}

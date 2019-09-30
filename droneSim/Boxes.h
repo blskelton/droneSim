@@ -146,8 +146,8 @@ public:
 				m_present_collisions[unit.get_id()][id] = unit.get_age();
 				return id;
 			}
-			return -1;
 		}
+		return -1;
 	};
 
 	//populates parameter array with 27 neighboring boxes
