@@ -24,6 +24,8 @@
 #include "Container.h"
 #include "Event.h"
 #include "simulator.h"
+#include "Packages.h"
+#include "globalMessaging.h"
 
 #ifndef Environment_h
 #define Environment_h
@@ -52,12 +54,25 @@ private:
 	std::mt19937 e2;
 	std::normal_distribution<> distribution;
 	float m_speed_change_frequency;
+
+	//unit colors
+	float unit_colors[4][3];
 	
 	//for package use case
-	Package m_packages[NUMBER_PACKAGES];
-	int m_package_statuses[NUMBER_PACKAGES];
-	float m_package_fall_times[NUMBER_PACKAGES];
-	std::vector<int> m_package_assignments[NUMBER_PACKAGES];
+	Packages* m_package_manager;
+
+	int m_package_carriers[NUMBER_PACKAGES];
+
+	//global messaging vector
+	//std::vector <std::array<Message, global_num_units>> m_messages;
+	int i = 0;
+	globalMessaging* m_global_messages;
+	int m_round;
+
+	//Package m_packages[NUMBER_PACKAGES];
+	//int m_package_statuses[NUMBER_PACKAGES];
+	//float m_package_fall_information[NUMBER_PACKAGES][2]; //2d array with fall time and height
+	//std::vector<int> m_package_assignments[NUMBER_PACKAGES];
 	
 	//longest time between consecutive events (in ms)
 	float m_longest_process;
@@ -95,28 +110,40 @@ public:
 		m_event_queue.emplace(speed_change_event);
 	};
 
+	inline void write_carrier(int unit_id, int assignment_id) {
+		m_package_carriers[assignment_id] = unit_id;
+	}
+
+	inline int query_carrier(int assignment_id) {
+		return m_package_carriers[assignment_id];
+	}
+
 	//returns current time
 	inline float get_time() {
 		return m_current_time;
-	}
+	};
+
+	inline int get_round() {
+		return m_round;
+	};
+
+	inline void recv_global_message(Message message) {
+		GlobalMessageEvent data = {message};
+		Event new_event = { GLOBAL_MESSAGE_EVENT, get_time() + get_message_delay(), {data} };
+		m_event_queue.emplace(new_event);
+	};
+
+	inline void write_message(Message message) {
+		m_global_messages->write_message(message);
+		//int round = message.get_round();
+		//int sender_id = message.get_sender();
+		//m_messages[round][sender_id] = message;
+	};
 
 	//returns random message delay
 	inline int get_message_delay() {
 		int delay = (int)abs(distribution(e2)) * 10;	
 		return delay;
-	};
-
-	//updates package assignment array
-	inline void update_assignment(int assignment_id, int content) {
-		m_package_assignments[assignment_id].push_back(content);
-	};
-
-	//returns most recent assignment entry
-	inline int check_assignment(int assignment_id) {
-		if (m_package_assignments[assignment_id].size() == 0) {
-			return -1;
-		}
-		return m_package_assignments[assignment_id].back();
 	};
 
 	//sets up packages
@@ -125,34 +152,80 @@ public:
 	//makes gl calls to draw packages
 	void draw_packages();
 
+	inline void update_package_location(int assignment_id, int unit_status, float unit_x, float unit_y, float unit_z) {
+		m_package_manager->set_location(assignment_id, unit_x, unit_y-0.5f, unit_z);
+	};
+
+	/*inline void update_package(int assignment_id, int unit_status, float unit_x, float unit_y, float unit_z) {
+		int status = -1;
+		if (unit_status == HEADED_TOWARDS_PICKUP) {
+			status = WAITING_FOR_PICKUP;
+		}
+		if (unit_status == CARRYING_PACKAGE) {
+			status = IN_TRANSIT;
+		}
+		float* new_dest = m_package_manager->update(assignment_id, status, unit_x, unit_y - 0.5f, unit_z);
+		//m_packages[id].update_status(status, x, y, z);
+		//m_packages[id].update_location(x, y, z);
+	};*/
+
+	inline int propose_status_change(int package_id, int current_unit_status, float x, float y, float z) {
+		//accepts current unit status and assignment id
+		//uses status, unit location, and package location to update package status
+		//return new unit status
+		return m_package_manager->propose_status_change(package_id, current_unit_status, x, y, z);
+	};
+
 	//returns a package given its id
 	inline Package& get_package_info(int id) {
-		Package& package = m_packages[id];
+		Package& package = m_package_manager->get_package(id);
 		return package;
 	};
 
-	/*inline void update_package_location(int id, float new_location[3]) {
-		m_packages[id].update_location(new_location);
-	};*/
+	//inline void update_package_carrier(int package_id, int carrier_id) {
+		//m_packages[package_id].update_carrier(carrier_id);
+	//};
 
-	inline void update_package_carrier(int package_id, int carrier_id) {
-		m_packages[package_id].update_carrier(carrier_id);
-	};
+	//inline int get_package_carrier(int package_id) {
+		//return m_packages[package_id].carrier;
+	//};
 
 	//returns package status given its id
 	inline int get_package_status(int id) {
-		Package& package = m_packages[id];
+		Package& package = m_package_manager->get_package(id);
 		return package.status;
 	}
 
 	//updates package status to given status
-	inline void update_package_status(int id, int status) {
-		m_packages[id].update_status(status);
-	}
+	/*inline void update_package_status(int id, int status, float x, float y, float z) {
+		m_packages[id].update_status(status, x, y, z);
+	}*/
+
+	inline int get_available_assignment_id() {
+		for (int i = 0; i < NUMBER_PACKAGES; i++) {
+			int status = m_package_manager->get_package(i).status;
+			if (status== DROPPED||status==UNINITIALIZED) {
+				if (query_carrier(i) == -1) {
+					return i;
+				}
+			}
+		}
+		return -1;
+	};
 
 	//writes current time into package_fall_times array for falling animation
-	inline void drop_package(int id) {
-		m_package_fall_times[id] = m_current_time;
+	inline void drop_package(int package_id, int unit_id) {
+		Unit carrier = m_unitArray[unit_id];
+		m_package_manager->set_status(package_id, DROPPING);
+		m_package_manager->set_location(package_id, carrier.get_location()[cX], carrier.get_location()[cY] - 0.5f, carrier.get_location()[cZ]);
+		write_carrier(-1, package_id);
+		m_package_manager->drop_package(package_id, m_current_time);
+		/*m_packages[id].update_location(carrier.get_location()[cX], carrier.get_location()[cY]-0.5f, carrier.get_location()[cZ]);
+		m_packages[id].update_carrier(-1);
+		//m_packages[id].update_status(DROPPING, carrier.get_location()[cX], carrier.get_location()[cY] - 0.5f, carrier.get_location()[cZ]);
+		m_packages[id].set_status(DROPPING);
+		m_package_fall_information[id][0] = m_current_time;
+		m_package_fall_information[id][1] = m_packages[id].position[cY];*/
 	}
 
 	//returns timestamp of earliest collision with a test direction
@@ -160,12 +233,7 @@ public:
 		return m_grid->get_earliest_collision(unit, location, direction, collision_partner_id);
 	};
 
-	//populates array with random position within container
-	inline void get_random_position(float (&numbers)[3]) {
-		numbers[cX] = (float)(rand() % 20) - 10;
-		numbers[cY] = (float)(rand() % 20) - 10;
-		numbers[cZ] = (float)(rand() % 20) - 30;
-	};
+
 
 	//updates age and collision information for a unit upon a speed/direction change
 	inline void recalculate_collisions(Unit& unit) {
@@ -254,6 +322,7 @@ public:
 						}
 					}
 					m_unitArray[currEvent.data.pingEvent.id].handle_ping_event(currEvent.data.pingEvent.tag);
+					//m_unitArray[currEvent.data.pingEvent.id].set_color(WHITE);
 				}
 
 				if (currEvent.tag == ETA_EVENT) {
@@ -299,6 +368,15 @@ public:
 					m_event_queue.emplace(speed_change_event);
 				}
 
+				if (currEvent.tag == GLOBAL_MESSAGE_EVENT) {
+					if (t > 0) {
+						for (int i = 0; i < global_num_units; i++) {
+							m_unitArray[i].process(t);
+						}
+					}
+					write_message(currEvent.data.globalMessageEvent.message);
+				}
+
 				if (t > m_longest_process) {
 					m_longest_process = t;
 				}
@@ -318,11 +396,11 @@ public:
 		//process all units for time remaining after processing all past events
 		for (int i = 0; i < global_num_units; i++) {
 			m_unitArray[i].process(time_remaining);
-			draw_unit(m_unitArray[i].get_id());
+			//draw_unit(m_unitArray[i].get_id());
 			m_unitArray[i].user_process();
 			check_core_collisions(m_unitArray[i]);
 		}
-
+		draw_units();
 		if (time_remaining > m_longest_process) {
 			m_longest_process = time_remaining;
 		}
@@ -331,6 +409,13 @@ public:
 			draw_packages();
 		}
 		m_prev_loop_end_time = m_curr_loop_start_time;
+		m_round++;
+		//std::array<Message, global_num_units> empty_array;
+		//m_messages.emplace_back(empty_array);
+		if (m_round > 200) {
+			int val = 0;
+		}
+		m_global_messages->add_array();
 	};
 
 	//checks for core collisions
@@ -345,6 +430,16 @@ public:
 	//get unit object from id
 	inline Unit& get_unit(int id) {
 		return m_unitArray[id];
+	};
+
+	inline std::array<Message, global_num_units>& recv(int round, bool &populated) {
+		//std::array<Message, global_num_units>& my_messages = m_global_messages->recv(round, populated);
+		return m_global_messages->recv(round, populated);
+		//std::array<Message, global_num_units> my_messages;
+	//	m_global_messages->test_recv(0, std::array<Message, global_num_units> &my_messages);
+		//m_global_messages->place_test_message();
+	//	m_global_messages->test_recv(0, my_messages);
+		//my_messages = m_global_messages->test_recv(round);
 	};
 
 	//access longest processing period
@@ -368,7 +463,7 @@ public:
 	};
 	
 	//calls to gl to draw unit
-	void draw_unit(int);
+	void draw_units();
 	
 	//adds message event to pq
 	void send_message(int, int);

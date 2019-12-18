@@ -126,7 +126,9 @@
     <ClCompile Include="Boxes.cpp" />
     <ClCompile Include="Container.cpp" />
     <ClCompile Include="Environment.cpp" />
+    <ClCompile Include="globalMessaging.cpp" />
     <ClCompile Include="Message.cpp" />
+    <ClCompile Include="Packages.cpp" />
     <ClCompile Include="simulator.cpp" />
     <ClCompile Include="Unit.cpp" />
   </ItemGroup>
@@ -134,6 +136,8 @@
     <ClInclude Include="Boxes.h" />
     <ClInclude Include="Event.h" />
     <ClInclude Include="Geometry.h" />
+    <ClInclude Include="globalMessaging.h" />
+    <ClInclude Include="Packages.h" />
     <ClInclude Include="simulator.h" />
     <ClInclude Include="Container.h" />
     <ClInclude Include="Environment.h" />

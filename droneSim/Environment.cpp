@@ -24,12 +24,18 @@
 #include "Boxes.h"
 
 
-Environment::Environment() : e2{ m_rd() }, distribution{ 100, 100 }, m_speed_change_frequency{ 1000 }, m_longest_process{0}
+Environment::Environment() : e2{ m_rd() }, distribution{ 100, 100 }, m_speed_change_frequency{ 1000 }, m_longest_process{0}, m_round{0}
 {
 	m_grid = new Boxes();
-	if (packages) {
-		initialize_packages();
+	m_package_manager = new Packages(globalContainer.get_leftX(), globalContainer.get_rightX());
+	m_global_messages = new globalMessaging();
+	for (int i = 0; i < NUMBER_PACKAGES; i++) {
+		m_package_carriers[i] = -1;
 	}
+
+	//if (packages) {
+		//initialize_packages();
+	//}
 }
 
 void Environment::add_unit(int unitID) {
@@ -77,19 +83,26 @@ bool Environment::check_initial_collisions(int id) {
 }
 
 void Environment::initialize_packages() {
-	float random_location[3];
+	/*float random_location[3];
 	float random_destination[3];
 	for (int i = 0; i < NUMBER_PACKAGES; i++) {
 		get_random_position(random_location);
 		get_random_position(random_destination);
-		m_packages[i] = Package(random_location, random_destination);
-	}
+		m_packages[i] = Package(random_location, random_destination, globalContainer.get_leftX(), globalContainer.get_rightX());
+	}*/
 }
 
 void Environment::draw_packages() {
 	for (int i = 0; i < NUMBER_PACKAGES; i++) {
-		Package package = m_packages[i];
-		if (package.status == WAITING_FOR_PICKUP) { //draw at init location, don't update location
+		Package package = m_package_manager->get_package(i);
+		if (package.status == DROPPING) {
+			m_package_manager->fall(i, m_current_time);
+			package = m_package_manager->get_package(i);
+		}
+		if (package.status == DROPPED) {
+
+		}
+		/*if (package.status == WAITING_FOR_PICKUP) { //draw at init location, don't update location
 			//glPushMatrix();
 			//glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
 			//glColor3f(1, 0, 0);
@@ -114,20 +127,21 @@ void Environment::draw_packages() {
 			//glPopMatrix();
 		}
 		if (package.status == DROPPED) {
-			float time_offset = m_current_time - m_package_fall_times[i];
-			float new_y = m_unitArray[i].get_location()[cY] - 0.5f - (time_offset * 0.0075f);
-			glPushMatrix();
+			float time_offset = m_current_time - m_package_fall_information[i][0];
+			float new_y = m_package_fall_information[i][1] - (time_offset * 0.0075f);
 			if (new_y <= globalContainer.get_bottomY()) {
 				new_y = (float)globalContainer.get_bottomY();
 			}
-			package.update_y(new_y);
-			//glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
+			package.position;
+			//package.update_location(package.position[cX], new_y, package.position[cZ]);
+			package.update_location(-1, new_y, -1);
+			glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
 
 			//glColor3f(1, 0, 0);
 			//glutWireCube(.25);
 			//glPopMatrix();
 
-		}
+		}*/
 		glPushMatrix();
 		glTranslatef(package.position[cX], package.position[cY], package.position[cZ]);
 		glColor3f(1, 1, 0);
@@ -136,26 +150,40 @@ void Environment::draw_packages() {
 	}
 }
 
-void Environment::draw_unit(int id) {
-	//get unit color, radius, location
-	Unit& currUnit = m_unitArray[id];
-	float unit_color_red = (currUnit.get_color())[0];
-	float unit_color_green = (currUnit.get_color())[1];
-	float unit_color_blue = (currUnit.get_color())[2];
-	glColor3f(unit_color_red, unit_color_green, unit_color_blue);
-	float radius = currUnit.get_radius();
-	float bufferRadius = currUnit.get_buffer_radius();
-	float* location = currUnit.get_location();
+void Environment::draw_units() {
+	for (int id = 0; id < global_num_units; id++) {
+		Unit& currUnit = m_unitArray[id];
+		int status = currUnit.get_status();
+		/*if (status == NOT_INITIALIZED) {
+			glColor3f(RED[cX], RED[cY], RED[cZ]);
+		}
+		if (status == AWAITING_TASK) {
+			glColor3f(BLUE[cX], BLUE[cY], BLUE[cZ]);
+		}
+		if (status == HEADED_TOWARDS_PICKUP || status == CARRYING_PACKAGE) {
+			glColor3f(GREEN[cX], GREEN[cY], GREEN[cZ]);
+		}
+		if (status == COLLISION_AVOIDANCE) {
+			glColor3f(YELLOW[cX], YELLOW[cY], YELLOW[cZ]);
+		}
+		if (status == CORE_COLLIDED) {
+			glColor3f(RED[cX], RED[cY], RED[cZ]);
+		}*/
+		glColor3f(GREEN[cX], GREEN[cY], GREEN[cZ]);
+		float radius = currUnit.get_radius();
+		float bufferRadius = currUnit.get_buffer_radius();
+		float* location = currUnit.get_location();
 
-	//draw unit
-	glPushMatrix();
-	glTranslatef(*(location), *(location + 1), *(location + 2));
-	//inside
-	glutSolidSphere(radius, 10, 10);
-	//outside
-	glColor4f((float) .5, (float) 0.5, (float) 0.5, .5);
-	glutSolidSphere(bufferRadius, 40,40);
-	glPopMatrix();
+		//draw unit
+		glPushMatrix();
+		glTranslatef(*(location), *(location + 1), *(location + 2));
+		//inside
+		glutSolidSphere(radius, 10, 10);
+		//outside
+		glColor4f((float) .5, (float) 0.5, (float) 0.5, .5);
+		glutSolidSphere(bufferRadius, 20, 20);
+		glPopMatrix();
+	}
 }
 
 void Environment::send_message(int id1, int id2) {

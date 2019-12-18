@@ -41,7 +41,10 @@ private:
 	queue<Event> m_message_queues[global_num_units]; //unprocessed messages
 	vector<unordered_map<int, vector<Message>>> m_sorted_messages; //processed messages
 	int m_msgsReceived;
-	float m_color[3];
+
+	//vector<std::array<Message, global_num_units>> m_global_messages;
+
+	bool m_flag = false; //true if pinged
 
 	bool m_in_container;
 	bool m_stopped;
@@ -98,12 +101,19 @@ public:
 	//returns true if an out-of-container unit is moving towards container
 	bool heading_back();
 
+	//set destination to package position
+	void initialize_assignment_destination();
+
 	//set destination to given parameters
 	void set_destination(float, float, float);
 
 	//returns container status
 	inline bool get_container_bool() {
 		return m_in_container;
+	};
+
+	inline int get_status() {
+		return m_status;
 	};
 
 	//attempt to find an assignment
@@ -114,7 +124,7 @@ public:
 		m_status = 3;
 		m_core_collided = true;
 		stop_unit();
-		set_color(RED);
+		//set_color(RED);
 	}
 
 	//update direction using collision avoidance protocol
@@ -207,16 +217,16 @@ public:
 	void update_location(float);
 
 	//returns color
-	inline float* get_color() {
+	/*inline float* get_color() {
 		return m_color;
-	};
+	};*/
 
 	//sets color
-	inline void set_color(const float color[3]) {
+	/*inline void set_color(const float color[3]) {
 		m_color[0] = color[0];
 		m_color[1] = color[1];
 		m_color[2] = color[2];
-	};
+	};*/
 
 	//returns radius
 	inline float get_radius() {

@@ -71,6 +71,10 @@ struct SpeedChangeEvent {
 
 };
 
+struct GlobalMessageEvent {
+	Message message;
+};
+
 //struct containing a tag indicating the event contents, a timestamp, and one of the above structs
 struct Event {
 	int tag; 
@@ -83,6 +87,7 @@ struct Event {
 		ETAEvent etaEvent;
 		WaitEvent waitEvent;
 		SpeedChangeEvent speedChangeEvent;
+		GlobalMessageEvent globalMessageEvent;
 
 		contents(BoxEvent boxEvent) {
 			this->boxEvent = boxEvent;
@@ -104,6 +109,9 @@ struct Event {
 		}
 		contents(SpeedChangeEvent speedChangeEvent) {
 			this->speedChangeEvent = speedChangeEvent;
+		}
+		contents(GlobalMessageEvent globalMessageEvent) {
+			this->globalMessageEvent = globalMessageEvent;
 		}
 	} data;
 	void update_timestamp(float start_time) {

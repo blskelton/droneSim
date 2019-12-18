@@ -26,7 +26,8 @@ class Container;
 extern Environment globalEnvironment;
 extern Container globalContainer;
 
-extern constexpr int global_num_units = 50;
+extern constexpr int global_num_units = 100;
+extern constexpr int global_num_faulty_units = global_num_units / 5 - 1;
 
 //coordinates for readability
 extern constexpr int cX = 0;
@@ -42,6 +43,7 @@ extern constexpr int ETA_EVENT = 4;
 extern constexpr int WAIT_EVENT = 5;
 extern constexpr int SPEED_CHANGE_EVENT = 6;
 extern constexpr int PING_EVENT = 7;
+extern constexpr int GLOBAL_MESSAGE_EVENT = 8;
 
 //colors
 extern constexpr float GREEN[3] = { (float)0.053, (float)0.51, (float)0.147 }; //base color
@@ -51,15 +53,18 @@ extern constexpr float WHITE[3] = {1,1,1}; //reached destination
 extern constexpr float BLUE[3] = { 0,0,1 }; //completed task
 
 //statuses
-extern constexpr int NOT_INITIALIZED = -1;
-extern constexpr int AWAITING_TASK = 0;
-extern constexpr int PERFORMING_TASK = 1;
-extern constexpr int COLLISION_AVOIDANCE = 2;
+extern constexpr int NOT_INITIALIZED = -1; //red
+extern constexpr int AWAITING_TASK = 0; //blue
+//extern constexpr int PERFORMING_TASK = 1; //green
+extern constexpr int COLLISION_AVOIDANCE = 2; //yellow
+extern constexpr int CORE_COLLIDED = 3; //red
+extern constexpr int HEADED_TOWARDS_PICKUP = 1; //also green????
+extern constexpr int CARRYING_PACKAGE = 4; 
 
 
 extern constexpr int TARGET_FPS = 24;
 
-extern constexpr bool packages = true;
+extern constexpr bool packages = false;
 extern constexpr int NUMBER_PACKAGES = 30;
 
 #endif /* simulator_h */

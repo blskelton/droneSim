@@ -35,8 +35,8 @@
 #include "simulator.h"
 
 //set-up
-int win_width = 1000;
-int win_height = 1000;
+float win_width = 1000;
+float win_height = 1000;
 
 float theta = 1.56999886f;
 float radius = 30;
@@ -79,6 +79,8 @@ void init(void) {
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_DEPTH_TEST);
+
+	//FILE *ffmpeg = popen("/usr/bin/ffmpeg -vcodec rawvideo -f rawvideo -pix_fmt rgb24 -s 640x480 -i pipe:0 -vf vflip -vcodec h264 -r 60 out.avi", "w");
 
 	init_scene();
 }
@@ -132,8 +134,8 @@ void display(void)
 }
 
 void reshape(int w, int h){
-	win_width = w;
-	win_height = h;
+	win_width = (float)w;
+	win_height = (float)h;
 	glViewport(0, 0, w, h);
 
 	glutPostRedisplay();

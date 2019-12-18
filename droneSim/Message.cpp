@@ -21,7 +21,7 @@ Message::Message(int tag, int unitID, int round, void* content): m_tag{tag}, m_u
 }
 
 Message::Message() {
-	m_tag = 0;
+	m_tag = -1;
 	m_unitID = 0;
 	m_round = 0;
 }

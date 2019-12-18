@@ -20,12 +20,6 @@
 #ifndef Geometry_h
 #define Geometry_h
 
-//package statuses
-extern constexpr int WAITING_FOR_PICKUP = 0;
-extern constexpr int IN_TRANSIT = 1;
-extern constexpr int AT_DESTINATION = 2;
-extern constexpr int DROPPED = 3;
-
 //coordinate plane defined by the coordinate it is in and its offset in that direction
 struct Plane {
 	int coordinate;
@@ -40,54 +34,17 @@ struct Plane {
 	}
 };
 
-//package for units to relocate
-struct Package {
-	float position[3]; //current position
-	float destination[3]; //goal position
-	int status;
-	int carrier;
 
-	void update_status(int new_status) {
-		status = new_status;
-		if (status == AT_DESTINATION) {
-			arrive();
-		}
-	}
+//get other location
+/*float x = (m_x - site_x);
+float y = (m_y - site_y);
+float z = (m_z - site_z);
 
-	void arrive() {
-		position[cX] = destination[cX];
-		position[cY] = destination[cY];
-		position[cZ] = destination[cZ];
-	}
+//use distance formula
+float distance = sqrt(abs(x*x + y * y + z * z));*/
 
-	void update_carrier(int id) {
-		carrier = id;
-	}
 
-	void update_location(float new_x, float new_y, float new_z) {
-		position[cX] = new_x;
-		position[cY] = new_y;
-		position[cZ] = new_z;
-	}
 
-	void update_y(float new_y) {
-		position[cY] = new_y;
-	}
-
-	//constructor
-	Package(float my_position[3], float my_destination[3]) {
-		position[cX] = my_position[cX];
-		position[cY] = my_position[cY];
-		position[cZ] = my_position[cZ];
-		destination[cX] = my_destination[cX];
-		destination[cY] = my_destination[cY];
-		destination[cZ] = my_destination[cZ];
-		status = 0;
-		carrier = -1;
-	}
-	Package() {
-	}
-};
 
 //sub-box for collision detection efficiency
 struct Box {
